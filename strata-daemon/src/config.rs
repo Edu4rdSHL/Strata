@@ -8,7 +8,10 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         let data_dir = dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
+            .expect(
+                "Could not determine XDG data directory. \
+                 Ensure $XDG_DATA_HOME or $HOME is set.",
+            )
             .join("strata");
 
         if let Err(e) = std::fs::create_dir_all(&data_dir) {
