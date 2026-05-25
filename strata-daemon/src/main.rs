@@ -6,7 +6,6 @@ mod dbus_service;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use base64::Engine as _;
 use dbus_service::{Limits, StrataManager, SubmitRequest, THUMB_PX};
 use tokio::sync::{mpsc, Mutex};
 use tracing_subscriber::EnvFilter;
@@ -263,7 +262,7 @@ async fn process_bytes(
             tokio::task::spawn_blocking(move || make_thumbnail(&raw_for_thumb, THUMB_PX)).await?;
 
         let thumb_bytes = match thumb_result {
-            Ok((bytes, _b64)) => bytes,
+            Ok(bytes) => bytes,
             Err(e) => {
                 tracing::warn!("Image thumbnail generation failed: {e}");
                 return Ok(());
@@ -347,17 +346,13 @@ fn read_clipboard_bytes(mime: &str) -> Result<(Vec<u8>, String)> {
     Ok((buf, actual_mime))
 }
 
-/// Generate a PNG thumbnail (≤`max_px`×`max_px`) from raw image bytes.
-/// Returns `(thumbnail_bytes, base64_preview)`.
-fn make_thumbnail(raw: &[u8], max_px: u32) -> Result<(Vec<u8>, String)> {
+/// Generate a PNG thumbnail (<=`max_px`x`max_px`) from raw image bytes.
+fn make_thumbnail(raw: &[u8], max_px: u32) -> Result<Vec<u8>> {
     let img = image::load_from_memory(raw).context("Decoding image")?;
-
     let thumb = img.thumbnail(max_px, max_px);
     let mut out = Vec::new();
     thumb
         .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
         .context("Encoding thumbnail")?;
-
-    let b64 = base64::engine::general_purpose::STANDARD.encode(&out);
-    Ok((out, b64))
+    Ok(out)
 }
