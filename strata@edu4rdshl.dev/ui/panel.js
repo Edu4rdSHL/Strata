@@ -85,19 +85,18 @@ export class StrataPanel {
         });
 
         // pushModal intercepts all motion events at the overlay level, so CSS
-        // :hover never fires on child actors. Manually track which item is
-        // under the cursor and toggle the JS-driven 'strata-item-hovered' class.
+        // :hover never fires on child actors. Use event.get_source() to let
+        // Clutter do the hit-test, then walk up to find the owning ClipboardItem.
+        // This is O(tree-depth) instead of O(n-widgets) per mouse-move event.
         this._overlay.connect('motion-event', (_actor, event) => {
-            const [cx, cy] = event.get_coords();
+            let source = event.get_source();
             let found = null;
-            for (const widget of this._widgets.values()) {
-                if (!widget.visible) continue;
-                const [wx, wy] = widget.get_transformed_position();
-                const [ww, wh] = widget.get_transformed_size();
-                if (cx >= wx && cx <= wx + ww && cy >= wy && cy <= wy + wh) {
-                    found = widget;
+            while (source && source !== this._overlay) {
+                if (source instanceof ClipboardItem) {
+                    found = source;
                     break;
                 }
+                source = source.get_parent();
             }
             if (found !== this._hoveredWidget) {
                 this._hoveredWidget?.remove_style_class_name('strata-item-hovered');
