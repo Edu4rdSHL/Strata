@@ -8,6 +8,7 @@ import St from 'gi://St';
 
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 import { StrataProxy, BUS_NAME, OBJECT_PATH } from './dbus.js';
@@ -299,16 +300,16 @@ export default class StrataExtension extends Extension {
 
     _notifyDaemonMissing() {
         try {
-            const source = new imports.ui.messageTray.Source({
+            const source = new MessageTray.Source({
                 title: 'Strata',
                 icon: new St.Icon({ icon_name: 'edit-paste-symbolic' }),
             });
             Main.messageTray.add(source);
-            const notification = new imports.ui.messageTray.Notification({
+            const notification = new MessageTray.Notification({
                 source,
                 title: 'Strata: daemon not found',
                 body: 'Install the strata-daemon package to enable clipboard history.',
-                urgency: imports.ui.messageTray.Urgency.HIGH,
+                urgency: MessageTray.Urgency.HIGH,
             });
             source.addNotification(notification);
         } catch (_) {
