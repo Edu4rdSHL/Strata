@@ -303,7 +303,6 @@ export class StrataPanel {
         this._items = [];
         this._hoveredWidget = null;
         this._activeWidget  = null;
-        this._widgets.forEach(w => w.destroy());
         this._widgets.clear();
         this._itemList.destroy_all_children();
     }
