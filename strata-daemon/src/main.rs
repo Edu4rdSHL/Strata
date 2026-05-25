@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use dbus_service::{Limits, StrataManager, SubmitRequest, THUMB_PX};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 use wl_clipboard_rs::paste::{get_contents, ClipboardType, MimeType, Seat};
 
@@ -23,7 +23,6 @@ async fn main() -> Result<()> {
 
     let cfg = config::Config::new();
     let db = Arc::new(db::Db::open(&cfg.db_path).context("Opening database")?);
-    let focused_app = Arc::new(Mutex::new(String::new()));
     let limits = Limits::with_defaults();
     limits
         .max_history
@@ -45,7 +44,6 @@ async fn main() -> Result<()> {
     let manager = StrataManager {
         db: db.clone(),
         limits: limits.clone(),
-        focused_app: focused_app.clone(),
         submit_tx,
         shutdown_tx,
     };

@@ -45,10 +45,6 @@ const STRATA_IFACE_XML = `
 
     <method name="ClearHistory"/>
 
-    <method name="SetFocusedApp">
-      <arg type="s" direction="in" name="app_id"/>
-    </method>
-
     <method name="Shutdown"/>
 
     <method name="SetConfig">

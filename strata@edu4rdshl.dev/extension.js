@@ -554,8 +554,6 @@ export default class StrataExtension extends Extension {
         this._focusSignalId = global.display.connect('notify::focus-window', () => {
             const win = global.display.focus_window;
             this._currentFocusedApp = (win?.get_wm_class() ?? '').toLowerCase();
-            // Inform the daemon (best-effort, ignore failures).
-            this._proxy?.SetFocusedAppRemote(this._currentFocusedApp, () => {});
         });
     }
 

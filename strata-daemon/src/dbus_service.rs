@@ -53,7 +53,6 @@ pub struct SubmitRequest {
 pub struct StrataManager {
     pub db: Arc<Db>,
     pub limits: Limits,
-    pub focused_app: Arc<tokio::sync::Mutex<String>>,
     pub submit_tx: tokio::sync::mpsc::UnboundedSender<SubmitRequest>,
     /// Send a `()` here to trigger graceful shutdown from the D-Bus Shutdown method.
     pub shutdown_tx: tokio::sync::mpsc::UnboundedSender<()>,
@@ -195,13 +194,6 @@ impl StrataManager {
         Self::history_cleared(&ctx)
             .await
             .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
-    }
-
-    /// Called by the GJS extension on every focused-window change.
-    /// Used for app exclusion: if the focused app is in the exclusion list,
-    /// the extension will immediately DeleteItem any new item from that app.
-    async fn set_focused_app(&self, app_id: String) {
-        *self.focused_app.lock().await = app_id;
     }
 
     /// Push runtime limits from the front-end. Takes effect immediately.
