@@ -267,22 +267,24 @@ impl Db {
     /// thumbnail_blob -- callers only need the original payload.
     pub fn get_raw_item(&self, id: &str) -> Result<Option<RawItem>> {
         let conn = lock_conn(&self.conn);
-        let result = conn.query_row(
-            "SELECT id, mime_type, content_text, content_blob, source_app, created_at
+        let result = conn
+            .query_row(
+                "SELECT id, mime_type, content_text, content_blob, source_app, created_at
              FROM clipboard_history WHERE id = ?1",
-            params![id],
-            |row| {
-                Ok(RawItem {
-                    id: row.get(0)?,
-                    mime_type: row.get(1)?,
-                    content_text: row.get(2)?,
-                    content_blob: row.get(3)?,
-                    thumbnail_blob: None,
-                    source_app: row.get(4)?,
-                    created_at: row.get(5)?,
-                })
-            },
-        ).ok();
+                params![id],
+                |row| {
+                    Ok(RawItem {
+                        id: row.get(0)?,
+                        mime_type: row.get(1)?,
+                        content_text: row.get(2)?,
+                        content_blob: row.get(3)?,
+                        thumbnail_blob: None,
+                        source_app: row.get(4)?,
+                        created_at: row.get(5)?,
+                    })
+                },
+            )
+            .ok();
         Ok(result)
     }
 
