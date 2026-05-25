@@ -30,9 +30,9 @@ const STRATA_IFACE_XML = `
     </method>
 
     <method name="GetItemContent">
-      <arg type="s" direction="in"  name="id"/>
-      <arg type="s" direction="out" name="mime_type"/>
-      <arg type="s" direction="out" name="content_b64"/>
+      <arg type="s"  direction="in"  name="id"/>
+      <arg type="s"  direction="out" name="mime_type"/>
+      <arg type="ay" direction="out" name="content"/>
     </method>
 
     <method name="SetClipboard">

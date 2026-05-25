@@ -471,8 +471,8 @@ export class StrataPanel {
 
     async _onItemActivated(id) {
         try {
-            const [mimeType, contentB64] = await this._proxy.GetItemContentAsync(id);
-            this._writeToClipboard(mimeType, GLib.base64_decode(contentB64));
+            const [mimeType, content] = await this._proxy.GetItemContentAsync(id);
+            this._writeToClipboard(mimeType, content);
         } catch (e) {
             console.error('[Strata] Paste error:', e);
         }

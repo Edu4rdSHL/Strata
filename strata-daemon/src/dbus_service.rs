@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use base64::Engine as _;
 use zbus::{interface, object_server::SignalContext};
 
 use crate::db::{Db, RawItem};
@@ -112,7 +111,8 @@ impl StrataManager {
     /// Return the raw content of a clipboard item for GJS to write to clipboard.
     /// GJS uses St.Clipboard (text) or Meta.SelectionSourceMemory (images)
     /// because the Wayland data-control protocol is not accessible from non-compositor processes.
-    async fn get_item_content(&self, id: String) -> zbus::fdo::Result<(String, String)> {
+    /// Content is returned as a raw byte array (`ay`) — no base64 round-trip.
+    async fn get_item_content(&self, id: String) -> zbus::fdo::Result<(String, Vec<u8>)> {
         let db = self.db.clone();
         let item: Option<RawItem> = tokio::task::spawn_blocking(move || db.get_raw_item(&id))
             .await
@@ -121,15 +121,15 @@ impl StrataManager {
 
         let item = item.ok_or_else(|| zbus::fdo::Error::Failed("Item not found".into()))?;
 
-        let content_b64 = if let Some(text) = item.content_text {
-            base64::engine::general_purpose::STANDARD.encode(text.as_bytes())
+        let content = if let Some(text) = item.content_text {
+            text.into_bytes()
         } else if let Some(blob) = item.content_blob {
-            base64::engine::general_purpose::STANDARD.encode(&blob)
+            blob
         } else {
             return Err(zbus::fdo::Error::Failed("Item has no content".into()));
         };
 
-        Ok((item.mime_type, content_b64))
+        Ok((item.mime_type, content))
     }
 
     /// Restore a clipboard item to the system clipboard.

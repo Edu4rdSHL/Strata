@@ -32,7 +32,6 @@ uuid               = { version = "1",    features = ["v4"] }
 
 # Image thumbnail generation (runs in spawn_blocking — never blocks async runtime)
 image              = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-base64             = { version = "0.22", features = ["std"] }
 
 # Fast content hashing for deduplication
 blake3             = "1"
