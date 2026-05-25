@@ -1,0 +1,17 @@
+# Rust build artifacts
+strata-daemon/target/
+
+# Bundled binary (no longer shipped - daemon must be installed separately)
+strata@edu4rdshl.dev/bin/
+
+# Screenshots / scratch images
+*.png
+
+# External reference code (not part of this project)
+external_sources/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+**/gschemas.compiled

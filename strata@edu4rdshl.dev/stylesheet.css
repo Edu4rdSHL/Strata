@@ -1,0 +1,205 @@
+/* Strata clipboard manager stylesheet.
+ *
+ * Performance rule: NO `transition: all`, NO Clutter/CSS animations.
+ * Only background-color transitions on hover (GPU-composited, zero JS).
+ * clip-to-allocation on the scroll view prevents overdraw outside the panel.
+ */
+
+/* ── Panel container ────────────────────────────────────────────────────── */
+.strata-panel {
+    background-color: rgba(30, 30, 30, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    min-width: 360px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.strata-header {
+    margin-bottom: 8px;
+}
+
+.strata-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.strata-clear-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.55);
+    padding: 3px 10px;
+    font-size: 0.85em;
+    transition: background-color 100ms;
+}
+
+.strata-clear-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Search box ─────────────────────────────────────────────────────────── */
+.strata-search {
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    caret-color: rgba(255, 255, 255, 0.8);
+}
+
+.strata-search:focus {
+    border-color: rgba(99, 163, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+/* ── Scroll view ────────────────────────────────────────────────────────── */
+.strata-scroll {
+    clip-to-allocation: true;
+}
+
+.strata-item-list {
+    spacing: 2px;
+}
+
+/* ── Clipboard item ─────────────────────────────────────────────────────── */
+.strata-item {
+    border-radius: 8px;
+    background-color: transparent;
+    padding: 0;
+    border: 1px solid transparent;
+    transition: background-color 100ms;
+}
+
+.strata-item:hover,
+.strata-item-hovered {
+    background-color: rgba(80, 140, 255, 0.18);
+    border-color: rgba(80, 140, 255, 0.45);
+}
+
+/* Keyboard-focused item - clearly distinct from hover with accent blue.
+ * Both :focus (CSS pseudo) and .strata-item-focused (JS-added class) are used
+ * for belt-and-suspenders reliability across GNOME Shell versions. */
+.strata-item:focus,
+.strata-item-focused {
+    background-color: rgba(80, 140, 255, 0.18);
+    border-color: rgba(80, 140, 255, 0.60);
+}
+
+.strata-item:hover:focus,
+.strata-item-focused.strata-item-hovered {
+    background-color: rgba(80, 140, 255, 0.28);
+    border-color: rgba(80, 140, 255, 0.70);
+}
+
+/* Bold the main text label when the item is focused.
+ * Also reinforced via JS key-focus-in signal in clipboardItem.js. */
+.strata-item:focus .strata-item-text,
+.strata-item-focused .strata-item-text {
+    font-weight: bold;
+    color: rgba(255, 255, 255, 1.0);
+}
+
+/* Active item - the most recently copied entry.
+ * Warm amber accent so it stands out from hover (white) and focus (blue). */
+.strata-item-active {
+    background-color: rgba(255, 200, 80, 0.14);
+    border-color: rgba(255, 200, 80, 0.45);
+}
+
+.strata-item-active .strata-item-text {
+    color: rgba(255, 235, 160, 1.0);
+}
+
+.strata-item-active.strata-item-hovered {
+    background-color: rgba(255, 200, 80, 0.22);
+}
+
+/* Blue focus wins over amber active when navigating via keyboard. */
+.strata-item-active.strata-item-focused,
+.strata-item-active:focus {
+    background-color: rgba(80, 140, 255, 0.22);
+    border-color: rgba(80, 140, 255, 0.60);
+}
+
+.strata-item-active.strata-item-focused .strata-item-text,
+.strata-item-active:focus .strata-item-text {
+    font-weight: bold;
+    color: rgba(255, 255, 255, 1.0);
+}
+
+.strata-item:active {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+.strata-item-row {
+    padding: 8px 10px;
+    spacing: 10px;
+}
+
+/* ── Item icon ──────────────────────────────────────────────────────────── */
+.strata-item-icon {
+    opacity: 0.6;
+    min-width: 20px;
+}
+
+/* ── Image thumbnail ────────────────────────────────────────────────────── */
+.strata-item-thumb {
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Color swatch ───────────────────────────────────────────────────────── */
+.strata-item-swatch {
+    /* Inline style used for actual color - only shape/border set here. */
+    min-width: 24px;
+    min-height: 24px;
+    border-radius: 4px;
+}
+
+/* ── Text content ───────────────────────────────────────────────────────── */
+.strata-item-content {
+    /* spacing between main and sub label */
+    spacing: 2px;
+}
+
+.strata-item-text {
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 0.95em;
+}
+
+.strata-item-url {
+    color: rgba(99, 163, 255, 0.9);
+}
+
+.strata-item-subtext {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.78em;
+}
+
+/* ── Delete button ──────────────────────────────────────────────────────── */
+.strata-item-delete {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.0);
+    padding: 4px;
+    border-radius: 6px;
+    transition: background-color 100ms, color 100ms;
+}
+
+/* Only show the delete icon on row hover or keyboard focus. */
+.strata-item:hover .strata-item-delete,
+.strata-item:focus .strata-item-delete,
+.strata-item-focused .strata-item-delete,
+.strata-item-hovered .strata-item-delete {
+    color: rgba(255, 80, 80, 0.7);
+}
+
+.strata-item-delete:hover {
+    background-color: rgba(255, 80, 80, 0.15);
+    color: rgba(255, 80, 80, 1.0);
+}

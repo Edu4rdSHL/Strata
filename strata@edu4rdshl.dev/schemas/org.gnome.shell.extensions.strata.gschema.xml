@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.strata"
+          path="/org/gnome/shell/extensions/strata/">
+
+    <key name="max-history" type="i">
+      <default>200</default>
+      <range min="50" max="2000"/>
+      <summary>Maximum number of clipboard history items to keep</summary>
+      <description>All stored items are searchable (text only) and reachable via scroll. Higher values use more disk space (~30KB per image, ~1KB per text item).</description>
+    </key>
+
+    <key name="max-text-mb" type="i">
+      <default>1</default>
+      <range min="1" max="100"/>
+      <summary>Maximum text clipboard item size (MB)</summary>
+      <description>Text payloads larger than this are not stored.</description>
+    </key>
+
+    <key name="max-image-mb" type="i">
+      <default>5</default>
+      <range min="1" max="100"/>
+      <summary>Maximum image clipboard item size (MB)</summary>
+      <description>Image payloads larger than this are not stored.</description>
+    </key>
+
+    <key name="page-size" type="i">
+      <default>50</default>
+      <range min="20" max="200"/>
+      <summary>Number of items to fetch per history page</summary>
+      <description>The panel loads this many rows on open and again each time the scroll reaches the bottom.</description>
+    </key>
+
+    <key name="keyboard-shortcut" type="as">
+      <default><![CDATA[['<Super><Shift>v']]]></default>
+      <summary>Keyboard shortcut to open the clipboard panel</summary>
+    </key>
+
+    <key name="panel-width" type="i">
+      <default>480</default>
+      <summary>Width of the clipboard panel in pixels</summary>
+    </key>
+
+    <key name="panel-max-height" type="i">
+      <default>600</default>
+      <summary>Maximum height of the clipboard panel in pixels</summary>
+    </key>
+
+    <key name="move-activated-to-top" type="b">
+      <default>true</default>
+      <summary>Move the selected item to the top of the list when activated</summary>
+      <description>When enabled, clicking or pressing Enter on a history item moves it to position 1 in the list.</description>
+    </key>
+
+    <key name="panel-position" type="s">
+      <choices>
+        <choice value="top-center"/>
+        <choice value="top-left"/>
+        <choice value="top-right"/>
+        <choice value="center"/>
+        <choice value="bottom-center"/>
+        <choice value="bottom-left"/>
+        <choice value="bottom-right"/>
+      </choices>
+      <default>'top-center'</default>
+      <summary>Position of the clipboard panel on screen</summary>
+    </key>
+
+    <key name="excluded-apps" type="as">
+      <default><![CDATA[['1password', 'keepassxc', 'keepass', 'gnome-secrets', 'bitwarden', 'dashlane', 'lastpass', 'enpass']]]></default>
+      <summary>App WM class substrings to exclude from clipboard history</summary>
+      <description>Items copied while one of these apps has keyboard focus will not be stored in history. The match is case-insensitive and uses substring matching.</description>
+    </key>
+
+  </schema>
+</schemalist>
