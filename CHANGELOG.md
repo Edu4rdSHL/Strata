@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- `_notifyDaemonMissing` now uses the correct ESM `MessageTray` import;
+  the missing-binary desktop notification was previously silently swallowed
+  by a `catch` block due to a `ReferenceError` on the legacy `imports.ui.*` path.
+- `clearItems()` no longer double-destroys widgets: `destroy_all_children()`
+  on the item list is sufficient; the preceding per-widget `destroy()` loop
+  was redundant and could trigger warnings.
+- Daemon now fails fast with a clear error message when the XDG data directory
+  cannot be determined, instead of silently placing the database in the
+  current working directory.
+
+### Performance
+
+- `make_thumbnail` return type simplified to `Result<Vec<u8>>`; the previously
+  returned base64 string was never used at the call site.
+- `prune()` now collects IDs with a single `ORDER BY` subquery, then deletes
+  with `DELETE WHERE id IN (...)`, eliminating a redundant second query.
+- `get_raw_item` no longer fetches `thumbnail_blob` (up to ~40 KB per row)
+  when only text/binary content is needed for paste-back.
+- Unnecessary clones of `WriteRequest` fields eliminated in `write_to_clipboard`.
+- Hover hit-testing in the panel replaced: the previous O(n) per-widget
+  bounds-check loop on every mouse-move is now O(tree-depth) via
+  `event.get_source()` + parent walk, letting Clutter's own hit-test do
+  the work.
+- `SetFocusedApp` D-Bus call removed. The daemon stored the value but never
+  read it; app exclusion runs entirely in the extension before `SubmitItem`
+  is called. Eliminates one IPC round-trip on every window focus change.
+- `GetItemContent` now returns raw bytes (`ay`) instead of a base64-encoded
+  string (`s`). Eliminates base64 encode in the daemon and decode in GJS on
+  every paste. The `base64` crate dependency has been removed entirely.
+
+---
+
 ## [0.2.0] - 2026-05-25
 
 ### Fixed

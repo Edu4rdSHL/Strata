@@ -102,7 +102,9 @@ creating a duplicate row.
 ### Wire format
 
 `SubmitItem` takes `ay` (D-Bus byte array) directly. No base64 encoding
-in JS, no decode step in Rust.
+in JS, no decode step in Rust. Likewise `GetItemContent` returns `(s, ay)` --
+mime type plus raw bytes -- so paste-back requires no base64 decode on the
+compositor thread either.
 
 ### Mime allowlist
 

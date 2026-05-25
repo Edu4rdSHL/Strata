@@ -75,10 +75,10 @@ Service `org.gnome.Strata`, object `/org/gnome/Strata`, interface `org.gnome.Str
 Methods: `GetHistory(offset u32, limit u32) -> json s`,
 `SearchHistory(query s, limit u32) -> json s`,
 `GetThumbnail(id s) -> png_bytes ay`,
-`GetItemContent(id s) -> (mime_type s, content_b64 s)`,
+`GetItemContent(id s) -> (mime_type s, content ay)`,
 `SetClipboard(id s)`, `DeleteItem(id s)`, `ClearHistory()`,
 `SetConfig(max_history u32, max_text_bytes u32, max_image_bytes u32)`,
-`SubmitItem(mime s, data ay)`, `SetFocusedApp(app_id s)`, `Shutdown()`.
+`SubmitItem(mime s, data ay)`, `Shutdown()`.
 
 Signals: `ItemAdded(id s, mime_type s, preview s)`, `ItemDeleted(id s)`, `HistoryCleared()`.
 
