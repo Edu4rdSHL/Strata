@@ -308,6 +308,7 @@ impl Db {
         if (count as usize) <= max_history {
             return Ok(Vec::new());
         }
+        // Collect IDs to delete with a single ORDER BY pass.
         let mut stmt = conn.prepare(
             "SELECT id FROM clipboard_history
              WHERE id NOT IN (
@@ -317,13 +318,16 @@ impl Db {
         let ids: Vec<String> = stmt
             .query_map(params![max_history as i64], |row| row.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        conn.execute(
-            "DELETE FROM clipboard_history
-             WHERE id NOT IN (
-                 SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1
-             )",
-            params![max_history as i64],
-        )?;
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Delete by collected IDs so the ORDER BY subquery runs only once.
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let sql = format!(
+            "DELETE FROM clipboard_history WHERE id IN ({})",
+            placeholders
+        );
+        conn.execute(&sql, rusqlite::params_from_iter(ids.iter()))?;
         Ok(ids)
     }
 }
