@@ -12,8 +12,10 @@ pub struct WriteRequest {
 }
 
 pub fn write_to_clipboard(req: WriteRequest) -> Result<()> {
-    let mime = req.mime_type.clone();
-    let bytes = req.content.clone();
+    let WriteRequest {
+        mime_type: mime,
+        content: bytes,
+    } = req;
 
     // For text, offer both the specific type and text/plain for compatibility.
     let sources: Vec<MimeSource> = if mime.starts_with("text/") {
@@ -23,7 +25,7 @@ pub fn write_to_clipboard(req: WriteRequest) -> Result<()> {
                 mime_type: MimeType::Specific(mime.clone()),
             },
             MimeSource {
-                source: Source::Bytes(bytes.clone().into()),
+                source: Source::Bytes(bytes.into()),
                 mime_type: MimeType::Specific("text/plain;charset=utf-8".into()),
             },
         ]
