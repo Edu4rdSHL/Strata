@@ -1,0 +1,14 @@
+[Unit]
+Description=Strata clipboard manager daemon
+Documentation=https://github.com/Edu4rdSHL/Strata
+# Start after the D-Bus session bus and the graphical session are available.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/strata-daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

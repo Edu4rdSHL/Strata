@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  daemon:
+    name: Rust daemon
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            strata-daemon/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('strata-daemon/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path strata-daemon/Cargo.toml -- --check
+
+      - name: Build
+        run: cargo build --release --manifest-path strata-daemon/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --manifest-path strata-daemon/Cargo.toml -- -W clippy::all
+
+      - name: Test
+        run: cargo test --manifest-path strata-daemon/Cargo.toml
+
+  extension:
+    name: GNOME extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install glib-compile-schemas
+        run: sudo apt-get update -q && sudo apt-get install -y libglib2.0-bin
+
+      - name: Compile GSettings schema
+        run: glib-compile-schemas strata@edu4rdshl.dev/schemas/

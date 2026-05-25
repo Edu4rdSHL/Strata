@@ -1,0 +1,267 @@
+/* clipboardItem.js - row widget for the clipboard list. */
+
+import GObject from 'gi://GObject';
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+
+const TEXT_PREVIEW_LEN = 140;
+const THUMB_SIZE = 48;
+
+const ICON_BY_MIME = {
+    'text/uri-list': 'emblem-web-symbolic',
+    'text/html':     'text-html-symbolic',
+    'image/':        'image-x-generic-symbolic',
+};
+
+function iconForMime(mimeType) {
+    for (const [prefix, icon] of Object.entries(ICON_BY_MIME)) {
+        if (mimeType.startsWith(prefix)) return icon;
+    }
+    return 'edit-copy-symbolic';
+}
+
+/** Detect if a string looks like a URL. */
+function isUrl(text) {
+    return /^https?:\/\/.+/i.test(text.trim());
+}
+
+/** Detect if a string looks like a CSS/hex color. */
+function isColor(text) {
+    return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(text.trim());
+}
+
+export const ClipboardItem = GObject.registerClass({
+    Signals: {
+        'activate': {},
+        'delete':   {},
+    },
+}, class ClipboardItem extends St.Button {
+    _init(id, mimeType, preview, opts = {}) {
+        super._init({
+            style_class: 'strata-item',
+            x_expand: true,
+            can_focus: true,
+            reactive: true,
+        });
+
+        this._id = id;
+        this._mimeType = mimeType;
+        /** D-Bus proxy used for lazy thumbnail fetch. */
+        this._proxy = opts.proxy ?? null;
+        /** Optional shared LRU cache (Map<id, string filePath>) - populated on first fetch. */
+        this._thumbCache = opts.thumbCache ?? null;
+        /** Stored on the actor so panel.js can filter by it. */
+        this.actor = this;
+        this._strataPreview = mimeType.startsWith('image/') ? '' : preview;
+
+        const row = new St.BoxLayout({
+            style_class: 'strata-item-row',
+            x_expand: true,
+        });
+
+        // Left: icon or image thumbnail
+        row.add_child(this._buildLeading(mimeType, preview));
+
+        // Center: text preview
+        row.add_child(this._buildContent(mimeType, preview));
+
+        // Right: delete button
+        const deleteBtn = new St.Button({
+            style_class: 'strata-item-delete',
+            icon_name: 'edit-delete-symbolic',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        deleteBtn.connect('clicked', () => {
+            this.emit('delete');
+            return Clutter.EVENT_STOP;
+        });
+        row.add_child(deleteBtn);
+
+        this.set_child(row);
+        this.connect('clicked', () => this.emit('activate'));
+
+        // Make the item text bold when keyboard-focused so the selected item
+        // is immediately obvious during arrow-key navigation.
+        // We add/remove an explicit style class because CSS :focus pseudo-class
+        // can be unreliable in GNOME Shell extensions.
+        this.connect('key-focus-in', () => {
+            this.add_style_class_name('strata-item-focused');
+            if (this._mainLabel)
+                this._mainLabel.style = 'font-weight: bold; color: rgba(255, 255, 255, 1.0);';
+        });
+        this.connect('key-focus-out', () => {
+            this.remove_style_class_name('strata-item-focused');
+            if (this._mainLabel)
+                this._mainLabel.style = null;
+        });
+    }
+
+    _buildLeading(mimeType, preview) {
+        if (mimeType.startsWith('image/')) {
+            return this._buildThumbnail(this._id);
+        }
+        if (isColor(preview)) {
+            return this._buildColorSwatch(preview);
+        }
+        const icon = new St.Icon({
+            icon_name: iconForMime(mimeType),
+            icon_size: 20,
+            style_class: 'strata-item-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        return icon;
+    }
+
+    /** Build an image thumbnail container.
+     *  - If already in shared cache, apply immediately.
+     *  - Else fetch via GetThumbnailRemote, write to ~/.cache/strata/thumbnails/{id}.png,
+     *    then apply. The decode happens off-thread (CSS background-image loader). */
+    _buildThumbnail(id) {
+        const container = new St.Widget({
+            width: THUMB_SIZE,
+            height: THUMB_SIZE,
+            style_class: 'strata-item-thumb',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        const cacheDir = `${GLib.get_user_cache_dir()}/strata/thumbnails`;
+        const cachePath = `${cacheDir}/${id}.png`;
+        const fileUri = `file://${cachePath}`;
+
+        const applyStyle = () => {
+            try {
+                container.style = `background-image: url("${fileUri}"); background-size: cover; background-repeat: no-repeat;`;
+            } catch (_) { /* container was destroyed mid-flight */ }
+        };
+
+        try {
+            // Fast path: already cached this session.
+            if (this._thumbCache?.has(id)) {
+                applyStyle();
+                return container;
+            }
+            // Second fast path: file exists on disk from a previous session.
+            if (GLib.file_test(cachePath, GLib.FileTest.EXISTS)) {
+                this._thumbCache?.set(id, cachePath);
+                applyStyle();
+                return container;
+            }
+            // Slow path: ask the daemon for the bytes, then write file async.
+            GLib.mkdir_with_parents(cacheDir, 0o755);
+            if (!this._proxy) {
+                this._fallbackIcon(container);
+                return container;
+            }
+            this._proxy.GetThumbnailRemote(id, ([bytes]) => {
+                try {
+                    if (!container.get_parent()) return; // destroyed
+                    if (!bytes || bytes.length === 0) {
+                        this._fallbackIcon(container);
+                        return;
+                    }
+                    const file = Gio.File.new_for_path(cachePath);
+                    file.replace_contents_bytes_async(
+                        new GLib.Bytes(bytes),
+                        null,
+                        false,
+                        Gio.FileCreateFlags.NONE,
+                        null,
+                        (_f, result) => {
+                            try {
+                                _f.replace_contents_finish(result);
+                                this._thumbCache?.set(id, cachePath);
+                                applyStyle();
+                            } catch (e) {
+                                console.error('[Strata] Thumbnail write error:', e);
+                                this._fallbackIcon(container);
+                            }
+                        }
+                    );
+                } catch (e) {
+                    console.error('[Strata] Thumbnail fetch handler error:', e);
+                    this._fallbackIcon(container);
+                }
+            });
+        } catch (e) {
+            console.error('[Strata] Thumbnail render error:', e);
+            this._fallbackIcon(container);
+        }
+        return container;
+    }
+
+    _fallbackIcon(container) {
+        if (container.get_n_children() > 0) return;
+        try {
+            const icon = new St.Icon({
+                icon_name: 'image-x-generic-symbolic',
+                icon_size: 20,
+                y_align: Clutter.ActorAlign.CENTER,
+                x_align: Clutter.ActorAlign.CENTER,
+            });
+            container.add_child(icon);
+        } catch (_) {}
+    }
+
+    _buildColorSwatch(hex) {
+        return new St.Widget({
+            width: 24,
+            height: 24,
+            style: `background-color: ${hex}; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);`,
+            style_class: 'strata-item-swatch',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+    }
+
+    _buildContent(mimeType, preview) {
+        preview = preview ?? '';
+        const box = new St.BoxLayout({
+            vertical: true,
+            x_expand: true,
+            style_class: 'strata-item-content',
+        });
+
+        let mainText = '';
+        let subText  = '';
+
+        if (mimeType.startsWith('image/')) {
+            mainText = mimeType === 'image/png' ? 'PNG image' : 'Image';
+        } else if (isUrl(preview)) {
+            mainText = preview.trim();
+            try {
+                subText = new URL(preview.trim()).hostname;
+            } catch (_) {}
+        } else if (isColor(preview)) {
+            mainText = preview.trim().toUpperCase();
+            subText  = 'Color';
+        } else {
+            const trimmed = preview.replace(/\s+/g, ' ').trim();
+            mainText = trimmed.length > TEXT_PREVIEW_LEN
+                ? trimmed.slice(0, TEXT_PREVIEW_LEN) + '…'
+                : trimmed;
+        }
+
+        const labelMain = new St.Label({
+            text: mainText || '(empty)',
+            style_class: `strata-item-text${isUrl(preview) ? ' strata-item-url' : ''}`,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        labelMain.clutter_text.line_wrap = false;
+        labelMain.clutter_text.ellipsize = 3; // PANGO_ELLIPSIZE_END
+        this._mainLabel = labelMain; // held for key-focus bold styling
+        box.add_child(labelMain);
+
+        if (subText) {
+            const labelSub = new St.Label({
+                text: subText,
+                style_class: 'strata-item-subtext',
+                x_expand: true,
+            });
+            box.add_child(labelSub);
+        }
+
+        return box;
+    }
+});
