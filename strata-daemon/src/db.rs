@@ -80,10 +80,6 @@ impl Db {
             CREATE UNIQUE INDEX IF NOT EXISTS idx_hash ON clipboard_history (content_hash);",
         )?;
 
-        // Migration: add thumbnail_blob column to existing databases.
-        conn.execute_batch("ALTER TABLE clipboard_history ADD COLUMN thumbnail_blob BLOB;")
-            .ok(); // Silently ignore error if column already exists.
-
         // FTS5 full-text search index over content_text only.
         // Images and other non-text items are NOT indexed - search filters
         // them out (an empty search shows everything; a non-empty search
