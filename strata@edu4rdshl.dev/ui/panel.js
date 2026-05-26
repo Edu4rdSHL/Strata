@@ -10,7 +10,6 @@ import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { ClipboardItem } from './clipboardItem.js';
 
-const SEARCH_LIMIT = 500;
 const SEARCH_DEBOUNCE_MS = 150;
 const LOAD_MORE_THRESHOLD = 200;
 
@@ -36,6 +35,9 @@ export class StrataPanel {
         this._searchQuery = '';          // current search string ('' = no search)
         this._searchDebounceId = null;   // pending GLib timeout for debounce
         this._searchEpoch = 0;           // monotonic counter to discard stale search responses
+        this._searchResults = [];        // full match snapshot (metadata) for the active query
+        this._searchRendered = 0;        // how many of _searchResults have widgets so far
+        this._resultsEpoch = -1;         // epoch whose results currently fill _searchResults
 
         this._visible = false;
         this._grab = null;        // Clutter.Grab from Main.pushModal
@@ -316,6 +318,15 @@ export class StrataPanel {
 
     removeItem(id) {
         this._items = this._items.filter(i => i.id !== id);
+        // Keep the search snapshot in sync so a deleted/pruned item sitting in
+        // the not-yet-rendered tail can't be re-created as a phantom row when
+        // scrolling appends the next page. Adjust _searchRendered if the removed
+        // item was within the already-rendered range so the index stays aligned.
+        const sIdx = this._searchResults.findIndex(r => r.id === id);
+        if (sIdx !== -1) {
+            this._searchResults.splice(sIdx, 1);
+            if (sIdx < this._searchRendered) this._searchRendered--;
+        }
         const widget = this._widgets.get(id);
         if (widget) {
             const wasActive  = widget === this._activeWidget;
@@ -334,6 +345,8 @@ export class StrataPanel {
 
     clearItems() {
         this._items = [];
+        this._searchResults = [];
+        this._searchRendered = 0;
         this._hoveredWidget = null;
         this._activeWidget  = null;
         this._widgets.clear();
@@ -357,10 +370,6 @@ export class StrataPanel {
         if (this._nameOwnerId) {
             this._proxy.disconnect(this._nameOwnerId);
             this._nameOwnerId = 0;
-        }
-        if (this._initialLoadId) {
-            GLib.Source.remove(this._initialLoadId);
-            this._initialLoadId = null;
         }
         if (this._searchDebounceId) {
             GLib.Source.remove(this._searchDebounceId);
@@ -422,16 +431,73 @@ export class StrataPanel {
     }
 
     _maybeLoadMore() {
-        if (this._searchQuery) return;
-        if (!this._hasMore || this._loadingMore) return;
+        if (this._loadingMore) return;
         const adj = this._scrollView.get_vadjustment();
         if (!adj || adj.upper <= adj.page_size) return;
         const distanceToBottom = adj.upper - (adj.value + adj.page_size);
         if (distanceToBottom > LOAD_MORE_THRESHOLD) return;
 
+        if (this._searchQuery) {
+            // Search mode: render the next page from the in-memory match
+            // snapshot (no re-query, so a scroll cannot race the search).
+            this._renderSearchPage(this._searchEpoch);
+        } else {
+            // Browse mode: pull the next page from the daemon.
+            if (!this._hasMore) return;
+            this._loadingMore = true;
+            this._loadHistory(this._loadedOffset, this._pageSize)
+                .finally(() => { this._loadingMore = false; });
+        }
+    }
+
+    /** Render the next page-size slice of `_searchResults` into the list.
+     *  Bounded per call so a broad query never builds every match at once;
+     *  scrolling calls this again until the snapshot is exhausted. */
+    async _renderSearchPage(epoch) {
+        if (epoch !== this._searchEpoch || !this._overlay) return;
+        // The snapshot must belong to this epoch. During a new query's fetch the
+        // epoch is already bumped while _searchResults still holds the previous
+        // set; rendering then would paint stale rows (and race the real render).
+        if (this._resultsEpoch !== epoch) return;
+        if (this._loadingMore) return;
+        const start = this._searchRendered;
+        if (start >= this._searchResults.length) return;
+
         this._loadingMore = true;
-        this._loadHistory(this._loadedOffset, this._pageSize)
-            .finally(() => { this._loadingMore = false; });
+        try {
+            const end = Math.min(start + this._pageSize, this._searchResults.length);
+            const BATCH = 20;
+            for (let i = start; i < end; i += BATCH) {
+                if (epoch !== this._searchEpoch || !this._overlay) return;
+                const renderChunk = () => {
+                    const e = Math.min(i + BATCH, end);
+                    for (let j = i; j < e; j++)
+                        this._appendItemFromMeta(this._searchResults[j]);
+                };
+                // The very first chunk of a fresh render (start === 0, right after
+                // _clearListDom) is rendered synchronously, in the same frame as
+                // the clear, so the list never paints empty in between - that
+                // empty frame is the "blink" seen while typing a search. Later
+                // chunks (and scroll-driven pages) yield to idle to keep frames
+                // light.
+                if (i === 0) {
+                    renderChunk();
+                } else {
+                    await new Promise(resolve =>
+                        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                            renderChunk();
+                            resolve();
+                            return GLib.SOURCE_REMOVE;
+                        }));
+                }
+            }
+            this._searchRendered = end;
+        } finally {
+            // Only release the guard if we still own the current search. If a
+            // newer search superseded us mid-render, it now owns the guard and
+            // must not be cleared by this stale render.
+            if (epoch === this._searchEpoch) this._loadingMore = false;
+        }
     }
 
 
@@ -571,8 +637,16 @@ export class StrataPanel {
      *  search cannot overwrite the results of a newer one. */
     async _runSearch(query) {
         const epoch = ++this._searchEpoch;
+        // A new search (or reset) supersedes any in-flight page render. Release
+        // the shared loading guard so this fresh render is never blocked by a
+        // stale one; the stale render bails on its own epoch check and, per the
+        // epoch-ownership check in _renderSearchPage, won't clear the guard out
+        // from under us.
+        this._loadingMore = false;
         if (!query) {
             this._searchQuery = '';
+            this._searchResults = [];
+            this._searchRendered = 0;
             this._clearListDom();
             this._items = [];
             this._loadedOffset = 0;
@@ -592,9 +666,12 @@ export class StrataPanel {
         }
 
         this._searchQuery = query;
+        // Fetch the full match set, bounded by the configured history size, so
+        // search covers everything that is stored (not an arbitrary cap).
+        const limit = this._settings.get_int('max-history');
         let json;
         try {
-            [json] = await this._proxy.SearchHistoryAsync(query, SEARCH_LIMIT);
+            [json] = await this._proxy.SearchHistoryAsync(query, limit);
         } catch (e) {
             console.error('[Strata] SearchHistory D-Bus error:', e);
             return;
@@ -611,22 +688,17 @@ export class StrataPanel {
 
         this._clearListDom();
         this._items = [];
-        // Disable pagination while searching - the search response is already
-        // bounded by SEARCH_LIMIT, scrolling shouldn't pull more.
+        // Snapshot the full match set and render it lazily, a page at a time,
+        // so a broad query on a large history never builds thousands of row
+        // widgets up front. Browse-mode pagination stays off; search paging is
+        // driven by _renderSearchPage over this snapshot (see _maybeLoadMore).
+        this._searchResults = results;
+        this._searchRendered = 0;
+        this._resultsEpoch = epoch;
         this._hasMore = false;
         this._loadedOffset = 0;
 
-        const BATCH = 20;
-        for (let i = 0; i < results.length; i += BATCH) {
-            if (epoch !== this._searchEpoch || !this._overlay) return;
-            await new Promise(resolve =>
-                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                    const end = Math.min(i + BATCH, results.length);
-                    for (let j = i; j < end; j++) this._appendItemFromMeta(results[j]);
-                    resolve();
-                    return GLib.SOURCE_REMOVE;
-                }));
-        }
+        await this._renderSearchPage(epoch);
     }
 
     /** Tear down all rendered item widgets (without touching the data model). */
