@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
+/// Characters of `content_text` returned as a display preview by the paginated
+/// and search list queries. The full payload is never sent over these paths --
+/// it is fetched on demand via `get_raw_item` / `GetItemContent` for paste-back.
+/// Keeping the trim in SQL means a page of large text items costs a few KB of
+/// JSON, not megabytes, and the work stays in the daemon.
+const PREVIEW_CHARS: usize = 200;
+
 /// Metadata for a clipboard entry - does NOT include thumbnail bytes.
 /// Thumbnails are fetched separately via `get_thumbnail` for lazy loading.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,13 +181,14 @@ impl Db {
             return Ok(Vec::new());
         }
 
-        let mut stmt = conn.prepare(
-            "SELECT id, mime_type, content_text, source_app, created_at,
+        let sql = format!(
+            "SELECT id, mime_type, substr(content_text, 1, {PREVIEW_CHARS}), source_app, created_at,
                     thumbnail_blob IS NOT NULL AS has_thumb
              FROM clipboard_history
              ORDER BY created_at DESC
-             LIMIT ?1 OFFSET ?2",
-        )?;
+             LIMIT ?1 OFFSET ?2"
+        );
+        let mut stmt = conn.prepare(&sql)?;
 
         let items = stmt
             .query_map(params![effective_limit as i64, offset as i64], |row| {
@@ -220,14 +228,15 @@ impl Db {
         }
         let fts_query = tokens.join(" ");
 
-        let mut stmt = conn.prepare(
-            "SELECT h.id, h.mime_type, h.content_text, h.source_app, h.created_at,
+        let sql = format!(
+            "SELECT h.id, h.mime_type, substr(h.content_text, 1, {PREVIEW_CHARS}), h.source_app, h.created_at,
                     h.thumbnail_blob IS NOT NULL AS has_thumb
              FROM clipboard_history h
              WHERE h.rowid IN (SELECT rowid FROM clipboard_fts WHERE clipboard_fts MATCH ?1)
              ORDER BY h.created_at DESC
-             LIMIT ?2",
-        )?;
+             LIMIT ?2"
+        );
+        let mut stmt = conn.prepare(&sql)?;
 
         let items = stmt
             .query_map(params![fts_query, limit as i64], |row| {

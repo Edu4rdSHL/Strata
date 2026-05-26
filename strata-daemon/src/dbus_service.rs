@@ -69,8 +69,9 @@ impl StrataManager {
             })
             .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
-    /// Return a page of recent items as JSON metadata (no inline thumbnail bytes).
-    /// Clients call GetThumbnail(id) lazily for items with has_thumbnail=true.
+    /// Return a page of recent items as JSON metadata (no inline thumbnail bytes,
+    /// content_text truncated to a preview). Clients call GetThumbnail(id) lazily
+    /// for items with has_thumbnail=true and GetItemContent(id) for full content.
     /// `offset` is from the most recent item (0 = newest).
     async fn get_history(&self, offset: u32, limit: u32) -> zbus::fdo::Result<String> {
         let db = self.db.clone();
