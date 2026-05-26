@@ -1,5 +1,7 @@
-/// Wayland clipboard monitor using the ext-data-control-v1 protocol (GNOME 47+)
-/// with a zwlr-data-control-v1 fallback for wlroots-based compositors.
+/// Wayland clipboard monitor using the ext-data-control-v1 protocol with a
+/// zwlr-data-control-v1 fallback for wlroots-based compositors. GNOME's Mutter
+/// exposes neither, so on GNOME this monitor does not bind and clipboard
+/// content arrives from the extension via Meta.Selection + SubmitItem.
 ///
 /// Runs on a dedicated OS thread (NOT on the tokio runtime) to avoid blocking
 /// the async executor. Communicates clipboard change events to the tokio world
@@ -245,7 +247,9 @@ fn probe_protocol(conn: &Connection) -> Result<Protocol> {
     // A quick roundtrip to get the global list; no persistent state needed here.
     let (globals, _) = registry_queue_init::<MonitorState>(conn)?;
 
-    // ext-data-control-v1 preferred (GNOME 47+, KDE Plasma 6)
+    // ext-data-control-v1 preferred (KDE Plasma 6 and other compositors that
+    // expose it). GNOME's Mutter does NOT expose it, so this probe fails on
+    // GNOME and ingest falls back to the extension's SubmitItem path.
     if globals.contents().with_list(|list| {
         list.iter()
             .any(|g| g.interface == "ext_data_control_manager_v1")
@@ -263,7 +267,8 @@ fn probe_protocol(conn: &Connection) -> Result<Protocol> {
 
     bail!(
         "No supported clipboard control protocol found.\n\
-         - GNOME: requires GNOME 47+ (Mutter implements ext-data-control-v1)\n\
+         - GNOME: Mutter exposes neither protocol; ingest comes from the\n\
+           extension via Meta.Selection + SubmitItem (this is expected).\n\
          - wlroots: requires zwlr-data-control-v1 (Sway, Hyprland, etc.)"
     );
 }

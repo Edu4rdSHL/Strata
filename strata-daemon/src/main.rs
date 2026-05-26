@@ -67,8 +67,10 @@ async fn main() -> Result<()> {
     tracing::info!("D-Bus service registered as org.gnome.Strata");
 
     // -----------------------------------------------------------------------
-    // Clipboard monitor (Wayland protocols - optional, soft-fail on GNOME)
-    // GJS provides clipboard content via SubmitItem when this is unavailable.
+    // Clipboard monitor (Wayland protocols - optional, soft-fail on GNOME).
+    // GNOME's Mutter does not expose ext-data-control-v1 or zwlr-data-control-v1,
+    // so this fails to bind there and the extension feeds content via SubmitItem
+    // instead. On wlroots compositors (Sway, Hyprland) the monitor is the path.
     // -----------------------------------------------------------------------
     match clipboard::monitor::spawn(clip_tx) {
         Ok(()) => tracing::info!("Wayland clipboard monitor started"),

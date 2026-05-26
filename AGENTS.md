@@ -97,3 +97,5 @@ Signals: `ItemAdded(id s, mime_type s, preview s)`, `ItemDeleted(id s)`, `Histor
 - `Ordering::Relaxed` is intentional on `Arc<AtomicUsize>` limits (advisory, not critical path).
 - Never execute clipboard content. Writes go through `wl-clipboard-rs` (`copy_multi`) in the daemon, never via shell subprocess or `eval`.
 - Excluded apps list is checked before storing any clipboard item.
+- Ingest paths are mutually exclusive by environment: on GNOME the monitor cannot bind (Mutter exposes neither data-control protocol) so ingest is GJS `SubmitItem`; on wlroots the built-in monitor is the path.
+- List queries (`get_history_page`, `search_history`) return `content_text` truncated to `PREVIEW_CHARS` via `substr`; full content is served only by `GetItemContent` for paste-back.

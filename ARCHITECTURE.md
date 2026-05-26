@@ -57,10 +57,13 @@ hot ingest path (it fires `SubmitItem` and returns immediately).
 `bin/strata-daemon` and registers a watchdog:
 
 - If the child exits, schedule a respawn with exponential backoff
-  (1 s, 2 s, 4 s, capped at 30 s).
-- After 5 rapid restarts within 60 s, stop and surface a notification.
+  (1 s, 2 s, 4 s, 8 s, 16 s). A run that lasts at least 5 s resets the
+  counter, so only a rapid crash loop escalates.
+- After 5 rapid restarts, stop retrying and log an error. (A missing
+  `strata-daemon` binary is reported up front with a desktop notification;
+  the crash-loop give-up is log-only.)
 - On disable, send `Shutdown` over D-Bus first, then `SIGTERM` if it
-  doesn't exit within 2 s.
+  doesn't exit within 1.5 s.
 
 ### Startup
 
@@ -182,15 +185,16 @@ search query, not the SQL parser.
 
 ### Pruning
 
-`upsert_item` checks `COUNT(*) > max_history` after each insert and
-deletes the oldest excess rows by `created_at ASC`, returning their ids.
-The D-Bus layer emits `ItemDeleted` for each so the extension can unlink
-the matching `~/.cache/strata/thumbnails/<id>.png`.
+After a genuinely new item is inserted, the ingest task calls `prune`,
+which deletes every row outside the newest `max_history` (by `created_at`)
+and returns their ids. The D-Bus layer emits `ItemDeleted` for each so the
+extension can unlink the matching `~/.cache/strata/thumbnails/<id>.png`.
 
 ## Concurrency
 
-The Rust daemon runs `tokio::main(flavor = "multi_thread")`. zbus
-dispatches each incoming method call on the executor. rusqlite is sync,
+The Rust daemon runs on a multi-threaded tokio runtime (`#[tokio::main]`,
+which defaults to the multi-thread flavor). zbus dispatches each incoming
+method call on the executor. rusqlite is sync,
 so every DB call is wrapped:
 
 ```rust
@@ -227,10 +231,13 @@ history size.
 ### Paginated history
 
 `GetHistory(offset, limit)` returns metadata only (id, mime, short text
-preview, timestamp). The panel loads `page-size` rows on open, then
-another page each time the scroll position passes ~80 % of the viewport.
-The Rust side serves these from the `idx_created_at DESC` index with
-`LIMIT/OFFSET`, which stays O(log n) for any history size.
+preview, timestamp). The preview is truncated in SQL (`substr`, first
+~200 chars), so a page of large text items costs a few KB of JSON rather
+than megabytes; the full payload is only fetched on paste-back via
+`GetItemContent`. The panel loads `page-size` rows on open, then another
+page each time the scroll position comes within a fixed threshold (200 px)
+of the bottom. The Rust side serves these from the `idx_created_at DESC`
+index with `LIMIT/OFFSET`, which stays O(log n) for any history size.
 
 Search shortcuts this path: when the search box is non-empty the panel
 calls `SearchHistory(query, limit)` instead and disables scroll-driven
