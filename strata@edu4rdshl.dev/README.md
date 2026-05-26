@@ -52,6 +52,7 @@ Open with `gnome-extensions prefs strata@edu4rdshl.dev`:
 - **Maximum image size** (1–100 MB, larger items are not stored)
 
 **Appearance**
+- **Theme** (Automatic / Light / Dark; Automatic follows the system light/dark preference)
 - **Panel width** (pixels)
 - **Panel max height** (pixels, list scrolls past this)
 - **Move activated item to top**

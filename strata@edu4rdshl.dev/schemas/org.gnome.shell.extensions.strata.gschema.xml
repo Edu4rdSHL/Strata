@@ -52,6 +52,17 @@
       <description>When enabled, clicking or pressing Enter on a history item moves it to position 1 in the list.</description>
     </key>
 
+    <key name="theme" type="s">
+      <choices>
+        <choice value="auto"/>
+        <choice value="light"/>
+        <choice value="dark"/>
+      </choices>
+      <default>'auto'</default>
+      <summary>Panel color theme</summary>
+      <description>Auto follows the system light/dark color scheme (org.gnome.desktop.interface color-scheme). Light and Dark force a fixed theme.</description>
+    </key>
+
     <key name="panel-position" type="s">
       <choices>
         <choice value="top-center"/>

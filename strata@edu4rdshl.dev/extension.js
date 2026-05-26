@@ -76,6 +76,10 @@ export default class StrataExtension extends Extension {
             this._settings.connect('changed::max-image-mb', () => { this._readSizeLimits(); this._pushConfig(); }),
         ];
 
+        // Load the light theme overrides into the Shell theme context. They stay
+        // inert until the panel toggles the `.strata-theme-light` class (panel.js).
+        this._loadThemeStylesheet();
+
         // 1. Top-bar indicator icon.
         this._addIndicator();
 
@@ -119,6 +123,7 @@ export default class StrataExtension extends Extension {
         this._panel = null;
         this._indicator?.destroy();
         this._indicator = null;
+        this._unloadThemeStylesheet();
         this._stopDaemon();
         this._proxy = null;
         this._settings = null;
@@ -566,16 +571,57 @@ export default class StrataExtension extends Extension {
 
 
     _registerShortcut() {
+        // POPUP is included so the shortcut still fires while the panel's own
+        // modal grab is active (pushModal sets actionMode POPUP). Without it the
+        // second press is swallowed by the grab and toggle() never runs, so the
+        // panel could open but not close via the shortcut.
         Main.wm.addKeybinding(
             'keyboard-shortcut',
             this._settings,
             Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
             () => this._panel?.toggle()
         );
     }
 
     _unregisterShortcut() {
         Main.wm.removeKeybinding('keyboard-shortcut');
+    }
+
+
+    /** Load light.css into the global St theme context. Scoped under
+     *  `.strata-theme-light`, so it does nothing until the panel adds that
+     *  class. Reloaded on theme-context changes (a Shell-theme switch drops
+     *  dynamically loaded stylesheets). */
+    _loadThemeStylesheet() {
+        try {
+            const themeContext = St.ThemeContext.get_for_stage(global.stage);
+            this._lightCssFile = this.dir.get_child('light.css');
+            themeContext.get_theme().load_stylesheet(this._lightCssFile);
+            this._stThemeChangedId = themeContext.connect('changed', () => {
+                try {
+                    themeContext.get_theme().load_stylesheet(this._lightCssFile);
+                } catch (e) {
+                    console.error('[Strata] light.css reload failed:', e);
+                }
+            });
+        } catch (e) {
+            console.error('[Strata] Failed to load light.css:', e);
+        }
+    }
+
+    _unloadThemeStylesheet() {
+        try {
+            const themeContext = St.ThemeContext.get_for_stage(global.stage);
+            if (this._stThemeChangedId) {
+                themeContext.disconnect(this._stThemeChangedId);
+                this._stThemeChangedId = null;
+            }
+            if (this._lightCssFile)
+                themeContext.get_theme().unload_stylesheet(this._lightCssFile);
+        } catch (e) {
+            console.error('[Strata] Failed to unload light.css:', e);
+        }
+        this._lightCssFile = null;
     }
 }

@@ -85,16 +85,14 @@ export const ClipboardItem = GObject.registerClass({
         // Make the item text bold when keyboard-focused so the selected item
         // is immediately obvious during arrow-key navigation.
         // We add/remove an explicit style class because CSS :focus pseudo-class
-        // can be unreliable in GNOME Shell extensions.
+        // can be unreliable in GNOME Shell extensions. The bold + focus text
+        // color live in CSS (.strata-item-focused .strata-item-text) so each
+        // theme (dark/light) can color them; we only toggle the class here.
         this.connect('key-focus-in', () => {
             this.add_style_class_name('strata-item-focused');
-            if (this._mainLabel)
-                this._mainLabel.style = 'font-weight: bold; color: rgba(255, 255, 255, 1.0);';
         });
         this.connect('key-focus-out', () => {
             this.remove_style_class_name('strata-item-focused');
-            if (this._mainLabel)
-                this._mainLabel.style = null;
         });
     }
 
@@ -250,7 +248,6 @@ export const ClipboardItem = GObject.registerClass({
         });
         labelMain.clutter_text.line_wrap = false;
         labelMain.clutter_text.ellipsize = 3; // PANGO_ELLIPSIZE_END
-        this._mainLabel = labelMain; // held for key-focus bold styling
         box.add_child(labelMain);
 
         if (subText) {

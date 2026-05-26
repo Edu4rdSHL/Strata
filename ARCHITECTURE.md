@@ -277,6 +277,23 @@ image.
   path in Strata executes clipboard content (no `spawn`, no
   `launch_uri`, no `show_uri`).
 
+## Theming
+
+St's CSS engine has no custom properties (`var()`) and no reliable
+`!important`, so the light theme is not a runtime-generated stylesheet.
+Instead `stylesheet.css` is the dark theme (default, auto-loaded by GNOME),
+and `light.css` carries light overrides with every rule scoped under a
+`.strata-theme-light` ancestor class. That scoping makes each light rule
+strictly more specific than its dark counterpart, so it wins
+deterministically regardless of stylesheet load order. `extension.js` loads
+`light.css` into the St theme context once at `enable()` (and re-loads it on
+theme-context `changed`, since a Shell-theme swap drops dynamically loaded
+sheets); it does nothing until the panel adds the class. The panel resolves
+the effective theme from the `theme` setting (`auto` consults
+`org.gnome.desktop.interface color-scheme`) and toggles the class on its
+root box. Switching themes is one class toggle on an existing subtree, off
+the ingest/render hot paths.
+
 ## Wayland clipboard monitor
 
 The daemon contains a `wl-clipboard-rs` monitor for `ext-data-control-v1`

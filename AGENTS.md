@@ -62,7 +62,9 @@ ssh fedoradev 'glib-compile-schemas ~/.local/share/gnome-shell/extensions/strata
 | `strata-daemon/src/db.rs` | SQLite schema, FTS5, insert, prune, search, thumbnail |
 | `strata-daemon/src/config.rs` | Data dir, DB path (`~/.local/share/strata/clipboard.db`) |
 | `strata@edu4rdshl.dev/extension.js` | Daemon lifecycle (PATH lookup + systemd detection), clipboard ingest, focus tracking, `_pushConfig` |
-| `strata@edu4rdshl.dev/ui/panel.js` | Popup panel, lazy-load pagination, search, `_pageSize` |
+| `strata@edu4rdshl.dev/ui/panel.js` | Popup panel, lazy-load pagination, search, `_pageSize`, theme class toggle (`_applyTheme`) |
+| `strata@edu4rdshl.dev/stylesheet.css` | Dark theme (default, auto-loaded by GNOME) |
+| `strata@edu4rdshl.dev/light.css` | Light theme overrides, scoped under `.strata-theme-light` |
 | `strata@edu4rdshl.dev/ui/clipboardItem.js` | Individual row widget |
 | `strata@edu4rdshl.dev/prefs.js` | Preferences window (Adw) |
 | `strata@edu4rdshl.dev/dbus.js` | D-Bus proxy definition and XML interface |
@@ -84,9 +86,16 @@ Signals: `ItemAdded(id s, mime_type s, preview s)`, `ItemDeleted(id s)`, `Histor
 
 ## GSettings keys
 
-`max-history`, `page-size`, `max-text-mb`, `max-image-mb`, `panel-position`,
+`max-history`, `page-size`, `max-text-mb`, `max-image-mb`, `theme`, `panel-position`,
 `panel-width`, `panel-max-height`, `keyboard-shortcut`, `move-activated-to-top`,
 `excluded-apps`.
+
+`theme` is `auto`/`light`/`dark`. `auto` follows `org.gnome.desktop.interface
+color-scheme`. Light styling lives in `light.css`, scoped under a
+`.strata-theme-light` class the panel toggles on its root box; `extension.js`
+loads/unloads `light.css` via the St theme context. New non-`stylesheet.css`
+CSS files must be added to the `pack` target as `--extra-source` (only
+`stylesheet.css` is auto-included by `gnome-extensions pack`).
 
 ## Conventions
 

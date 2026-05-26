@@ -1,6 +1,7 @@
 /* panel.js - Strata clipboard popup panel. */
 
 import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Meta from 'gi://Meta';
@@ -42,6 +43,17 @@ export class StrataPanel {
         this._activeWidget = null;  // most recently copied item
 
         this._buildUI();
+
+        // Theme: apply light/dark to the panel box and react to changes.
+        // The light.css overrides (loaded by extension.js) only take effect
+        // while the `.strata-theme-light` class is present on `_box`.
+        this._interfaceSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+        this._applyTheme();
+        this._themeChangedId = this._settings.connect('changed::theme',
+            () => this._applyTheme());
+        this._colorSchemeChangedId = this._interfaceSettings.connect('changed::color-scheme',
+            () => this._applyTheme());
+
         // Trigger the initial load as soon as the daemon owns its bus name.
         // At extension boot the daemon may still be starting (its D-Bus name
         // not yet owned); the proxy fires notify::g-name-owner when that
@@ -51,6 +63,24 @@ export class StrataPanel {
         this._tryInitialLoad();
         this._nameOwnerId = this._proxy.connect('notify::g-name-owner',
             () => this._tryInitialLoad());
+    }
+
+    /** True when the effective theme is light. `auto` follows the system
+     *  color-scheme (anything other than prefer-dark counts as light). */
+    _effectiveIsLight() {
+        const mode = this._settings.get_string('theme');
+        if (mode === 'light') return true;
+        if (mode === 'dark') return false;
+        return this._interfaceSettings.get_string('color-scheme') !== 'prefer-dark';
+    }
+
+    /** Toggle the light-theme class on the panel root box. */
+    _applyTheme() {
+        if (!this._box) return;
+        if (this._effectiveIsLight())
+            this._box.add_style_class_name('strata-theme-light');
+        else
+            this._box.remove_style_class_name('strata-theme-light');
     }
 
     _tryInitialLoad() {
@@ -146,6 +176,10 @@ export class StrataPanel {
             x_expand: true,
             can_focus: true,
         });
+        // Tag the placeholder label so the light theme can recolor it. By
+        // default it inherits a light-on-dark Shell color that is illegible on
+        // the light panel; dark mode is unaffected (no base rule).
+        this._searchEntry.get_hint_actor()?.add_style_class_name('strata-search-hint');
         this._searchEntry.get_clutter_text().connect('text-changed', () => {
             this._scheduleSearch(this._searchEntry.get_text());
         });
@@ -311,6 +345,15 @@ export class StrataPanel {
             this._settings.disconnect(this._pageSizeChangedId);
             this._pageSizeChangedId = 0;
         }
+        if (this._themeChangedId) {
+            this._settings.disconnect(this._themeChangedId);
+            this._themeChangedId = 0;
+        }
+        if (this._colorSchemeChangedId && this._interfaceSettings) {
+            this._interfaceSettings.disconnect(this._colorSchemeChangedId);
+            this._colorSchemeChangedId = 0;
+        }
+        this._interfaceSettings = null;
         if (this._nameOwnerId) {
             this._proxy.disconnect(this._nameOwnerId);
             this._nameOwnerId = 0;

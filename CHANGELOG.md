@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Light/dark theme support. A new **Theme** preference (Automatic / Light /
+  Dark) controls the panel palette; Automatic follows the system
+  `org.gnome.desktop.interface color-scheme`. The dark theme is unchanged.
+  Light styling lives in `light.css`, scoped under a `.strata-theme-light`
+  class toggled on the panel root box, loaded into the St theme context by
+  the extension. Switching is a single class toggle with no runtime cost on
+  the ingest/render paths.
+
+### Fixed
+
+- The keyboard shortcut now hides the panel when it is already open. The
+  binding was registered without `Shell.ActionMode.POPUP`, so while the
+  panel's modal grab was active the second press was swallowed and
+  `toggle()` never ran.
+- The search placeholder ("Search...") is now legible in the light theme; it
+  previously inherited a light-on-dark Shell color.
+
+### Packaging
+
+- `make pack` now bundles `light.css` (`--extra-source`); only
+  `stylesheet.css` is auto-included by `gnome-extensions pack`.
+
+---
+
 ## [0.4.0] - 2026-05-26
 
 ### Performance

@@ -92,6 +92,29 @@ export default class StrataPreferences extends ExtensionPreferences {
         // ── Appearance ───────────────────────────────────────────────────────
         const appearanceGroup = new Adw.PreferencesGroup({ title: 'Appearance' });
 
+        const themes = [
+            { id: 'auto',  label: 'Automatic' },
+            { id: 'light', label: 'Light'     },
+            { id: 'dark',  label: 'Dark'      },
+        ];
+        const themeRow = new Adw.ComboRow({
+            title: 'Theme',
+            subtitle: 'Automatic follows the system light/dark preference',
+            model: Gtk.StringList.new(themes.map(t => t.label)),
+        });
+        const currentTheme = settings.get_string('theme');
+        const currentThemeIdx = themes.findIndex(t => t.id === currentTheme);
+        themeRow.selected = currentThemeIdx >= 0 ? currentThemeIdx : 0;
+        themeRow.connect('notify::selected', () => {
+            settings.set_string('theme', themes[themeRow.selected].id);
+        });
+        settings.connect('changed::theme', () => {
+            const idx = themes.findIndex(t => t.id === settings.get_string('theme'));
+            if (idx >= 0 && themeRow.selected !== idx)
+                themeRow.selected = idx;
+        });
+        appearanceGroup.add(themeRow);
+
         const panelWidthRow = new Adw.SpinRow({
             title: 'Panel width',
             subtitle: 'Width of the clipboard panel in pixels',

@@ -37,6 +37,7 @@ install: schemas
 pack: schemas
 	gnome-extensions pack $(EXTENSION_UUID) \
 		--extra-source=ui \
+		--extra-source=light.css \
 		--force
 	@echo "Packed: $(EXTENSION_UUID).shell-extension.zip"
 

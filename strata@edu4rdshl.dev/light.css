@@ -1,0 +1,143 @@
+/* Strata light theme.
+ *
+ * Loaded into the Shell theme context by extension.js and activated by toggling
+ * the `.strata-theme-light` class on the panel root box (see ui/panel.js).
+ * Every rule is scoped under `.strata-theme-light` so it is strictly more
+ * specific than its counterpart in stylesheet.css and wins deterministically,
+ * regardless of stylesheet load order. The dark theme (stylesheet.css) is left
+ * untouched: with no class present, none of these rules apply.
+ *
+ * Colors follow GNOME Adwaita (blue #3584e4, link #1a5fb4, amber #b5830a,
+ * red #e01b24) and are picked for contrast on a light panel.
+ *
+ * Performance rule (same as stylesheet.css): NO `transition: all`, NO
+ * Clutter/CSS animations. Only background-color transitions on hover.
+ */
+
+/* ── Panel container ────────────────────────────────────────────────────── */
+.strata-panel.strata-theme-light {
+    background-color: rgba(250, 250, 250, 0.98);
+    border-color: rgba(0, 0, 0, 0.14);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.strata-theme-light .strata-title {
+    color: rgba(0, 0, 0, 0.87);
+}
+
+.strata-theme-light .strata-clear-btn {
+    border-color: rgba(0, 0, 0, 0.18);
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.strata-theme-light .strata-clear-btn:hover {
+    background-color: rgba(0, 0, 0, 0.07);
+    color: rgba(0, 0, 0, 0.85);
+}
+
+/* ── Search box ─────────────────────────────────────────────────────────── */
+.strata-theme-light .strata-search {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.14);
+    color: rgba(0, 0, 0, 0.87);
+    caret-color: rgba(0, 0, 0, 0.8);
+}
+
+.strata-theme-light .strata-search:focus {
+    border-color: rgba(53, 132, 228, 0.8);
+    background-color: rgba(0, 0, 0, 0.035);
+}
+
+/* Placeholder ("Search...") text - legible dim gray on the light panel. */
+.strata-theme-light .strata-search-hint {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Clipboard item: hover / focus (Adwaita blue) ───────────────────────── */
+.strata-theme-light .strata-item:hover,
+.strata-theme-light .strata-item-hovered {
+    background-color: rgba(53, 132, 228, 0.14);
+    border-color: rgba(53, 132, 228, 0.45);
+}
+
+.strata-theme-light .strata-item:focus,
+.strata-theme-light .strata-item-focused {
+    background-color: rgba(53, 132, 228, 0.16);
+    border-color: rgba(53, 132, 228, 0.65);
+}
+
+.strata-theme-light .strata-item:hover:focus,
+.strata-theme-light .strata-item-focused.strata-item-hovered {
+    background-color: rgba(53, 132, 228, 0.24);
+    border-color: rgba(53, 132, 228, 0.78);
+}
+
+.strata-theme-light .strata-item:focus .strata-item-text,
+.strata-theme-light .strata-item-focused .strata-item-text {
+    color: rgba(0, 0, 0, 0.95);
+}
+
+/* ── Active item (warm amber, darkened for light bg) ────────────────────── */
+.strata-theme-light .strata-item-active {
+    background-color: rgba(181, 131, 10, 0.16);
+    border-color: rgba(181, 131, 10, 0.50);
+}
+
+.strata-theme-light .strata-item-active .strata-item-text {
+    color: rgba(120, 82, 0, 1.0);
+}
+
+.strata-theme-light .strata-item-active.strata-item-hovered {
+    background-color: rgba(181, 131, 10, 0.24);
+}
+
+.strata-theme-light .strata-item-active.strata-item-focused,
+.strata-theme-light .strata-item-active:focus {
+    background-color: rgba(53, 132, 228, 0.20);
+    border-color: rgba(53, 132, 228, 0.65);
+}
+
+.strata-theme-light .strata-item-active.strata-item-focused .strata-item-text,
+.strata-theme-light .strata-item-active:focus .strata-item-text {
+    color: rgba(0, 0, 0, 0.95);
+}
+
+.strata-theme-light .strata-item:active {
+    background-color: rgba(0, 0, 0, 0.10);
+}
+
+/* ── Item icon / thumbnail ──────────────────────────────────────────────── */
+.strata-theme-light .strata-item-icon {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.strata-theme-light .strata-item-thumb {
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* ── Text content ───────────────────────────────────────────────────────── */
+.strata-theme-light .strata-item-text {
+    color: rgba(0, 0, 0, 0.85);
+}
+
+.strata-theme-light .strata-item-url {
+    color: rgba(26, 95, 180, 1.0);
+}
+
+.strata-theme-light .strata-item-subtext {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Delete button (Adwaita red) ────────────────────────────────────────── */
+.strata-theme-light .strata-item:hover .strata-item-delete,
+.strata-theme-light .strata-item:focus .strata-item-delete,
+.strata-theme-light .strata-item-focused .strata-item-delete,
+.strata-theme-light .strata-item-hovered .strata-item-delete {
+    color: rgba(224, 27, 36, 0.75);
+}
+
+.strata-theme-light .strata-item-delete:hover {
+    background-color: rgba(224, 27, 36, 0.13);
+    color: rgba(224, 27, 36, 1.0);
+}
