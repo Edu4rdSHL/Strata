@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.6.0] - 2026-05-26
+
+### Added
+
+- Lazy, full-history search. Search now covers the entire stored history (up
+  to `max-history`) instead of an arbitrary 500-result cap, and renders a page
+  at a time as you scroll instead of building every match at once. Results are
+  snapshotted once and paged from memory, so scrolling never re-queries.
+
+### Fixed
+
+- Images other than PNG/JPEG (GIF, WebP, BMP, TIFF, ICO) were silently dropped
+  because the daemon could not decode them. They are now decoded and stored.
+  AVIF and SVG are no longer accepted (not decodable here), rather than
+  accepted-then-dropped.
+- Search no longer "blinks" (paints an empty list) between keystrokes; the
+  first page renders in the same frame as the clear.
+- Search render race conditions: a fast new query can no longer be blocked by a
+  superseded render, render a previous query's stale results, or leave a pruned
+  item behind as a phantom row on scroll.
+- `ItemAdded` preview length now matches the history/search queries (200
+  chars), so a just-copied row and the same row after a reload show the same
+  text.
+- Deterministic ordering for items that share a millisecond timestamp
+  (`created_at DESC, rowid DESC`), so pruning can't evict the wrong one.
+- Lowering **max history** now prunes stored items immediately instead of
+  waiting for the next copy.
+- Extension lifecycle: the `excluded-apps` settings handler and the daemon
+  force-kill timer are now released on disable; the exclusion-path delete is
+  null-guarded.
+- The daemon requests its bus name with `AllowReplacement` for a clean hand-off
+  on extension reload; the Wayland monitor clears stale offers on clipboard
+  clear.
+
+### Changed
+
+- Image rows show a generic "Image" label instead of singling out PNG.
+
+---
+
 ## [0.5.0] - 2026-05-26
 
 ### Added
