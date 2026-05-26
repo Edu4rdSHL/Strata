@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.0] - 2026-05-26
+
+### Performance
+
+- `GetHistory` / `SearchHistory` now truncate `content_text` to a preview
+  (`substr`, ~200 chars) in SQL instead of returning the full payload. A
+  page of large text items previously serialized up to megabytes of JSON
+  over D-Bus and parsed it on the GJS main loop, only to render a 140-char
+  snippet. Full content is still served on demand by `GetItemContent`.
+
+---
+
 ## [0.3.0] - 2026-05-25
 
 ### Fixed
