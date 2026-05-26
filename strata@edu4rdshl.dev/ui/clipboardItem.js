@@ -224,7 +224,10 @@ export const ClipboardItem = GObject.registerClass({
         let subText  = '';
 
         if (mimeType.startsWith('image/')) {
-            mainText = mimeType === 'image/png' ? 'PNG image' : 'Image';
+            // Generic label - the thumbnail identifies the image, and the
+            // on-clipboard format (often PNG even for a copied GIF/WebP) is an
+            // implementation detail that misleads more than it informs.
+            mainText = 'Image';
         } else if (isUrl(preview)) {
             mainText = preview.trim();
             try {

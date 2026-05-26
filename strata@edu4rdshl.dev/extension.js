@@ -62,10 +62,16 @@ export default class StrataExtension extends Extension {
     enable() {
         this._shuttingDown = false;
         this._daemonRestartAttempts = 0;
+        // Cancel any pending force-kill timer left over from a previous disable
+        // (enable→disable→enable within 1.5s) so it can't outlive this cycle.
+        if (this._daemonKillTimerId) {
+            GLib.Source.remove(this._daemonKillTimerId);
+            this._daemonKillTimerId = null;
+        }
 
         this._settings = this.getSettings();
         this._excludedApps = this._settings.get_strv('excluded-apps');
-        this._settings.connect('changed::excluded-apps', () => {
+        this._excludedAppsChangedId = this._settings.connect('changed::excluded-apps', () => {
             this._excludedApps = this._settings.get_strv('excluded-apps');
         });
 
@@ -118,6 +124,10 @@ export default class StrataExtension extends Extension {
         if (this._configChangedIds && this._settings) {
             for (const id of this._configChangedIds) this._settings.disconnect(id);
             this._configChangedIds = null;
+        }
+        if (this._excludedAppsChangedId && this._settings) {
+            this._settings.disconnect(this._excludedAppsChangedId);
+            this._excludedAppsChangedId = null;
         }
         this._panel?.destroy();
         this._panel = null;
@@ -229,8 +239,7 @@ export default class StrataExtension extends Extension {
         const PREFERRED = [
             // Raster images (size-capped at MAX_IMAGE).
             'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp',
-            'image/bmp', 'image/tiff', 'image/avif', 'image/x-icon',
-            'image/svg+xml',
+            'image/bmp', 'image/tiff', 'image/x-icon',
             // Plain text (UTF-8 preferred, then locale, then X11 legacy aliases).
             // Ranked above rich-text so editors that expose both text/plain and
             // text/html give us raw source, not styled markup.
@@ -374,8 +383,10 @@ export default class StrataExtension extends Extension {
             // Graceful shutdown via D-Bus first.
             this._proxy?.ShutdownRemote(() => {});
         } catch (_) {}
-        // Give it 1.5s then force-terminate.
-        GLib.timeout_add(GLib.PRIORITY_LOW, 1500, () => {
+        // Give it 1.5s then force-terminate. Track the source so a re-enable
+        // within that window can cancel it (see enable()).
+        this._daemonKillTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, 1500, () => {
+            this._daemonKillTimerId = null;
             try { daemonToStop.send_signal(15); } catch (_) {} // SIGTERM
             return GLib.SOURCE_REMOVE;
         });
@@ -532,7 +543,7 @@ export default class StrataExtension extends Extension {
             // Exclusion check - no clipboard I/O, just string comparison.
             if (this._isExcluded(this._currentFocusedApp)) {
                 try {
-                    await this._proxy.DeleteItemAsync(id);
+                    await this._proxy?.DeleteItemAsync(id);
                 } catch (e) {
                     // ignore - item may already be gone
                 }
