@@ -125,7 +125,9 @@ impl Dispatch<ExtDataControlDeviceV1, ()> for MonitorState {
                 offer.destroy();
             }
             ext_data_control_device_v1::Event::Selection { id: None } => {
-                // null id means "clipboard cleared" - ignore.
+                // null id means "clipboard cleared". Drop any accumulated offers
+                // so the map can't grow across copy-then-clear cycles.
+                state.offers.clear();
             }
             ext_data_control_device_v1::Event::Finished => {
                 tracing::warn!("ext-data-control device finished (compositor revoked access)");
@@ -184,7 +186,9 @@ impl Dispatch<ZwlrDataControlDeviceV1, ()> for MonitorState {
                 state.commit_selection(oid);
                 offer.destroy();
             }
-            zwlr_data_control_device_v1::Event::Selection { id: None } => {}
+            zwlr_data_control_device_v1::Event::Selection { id: None } => {
+                state.offers.clear();
+            }
 
             zwlr_data_control_device_v1::Event::Finished => {
                 tracing::warn!("zwlr-data-control device finished");

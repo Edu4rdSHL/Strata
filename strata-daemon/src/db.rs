@@ -9,7 +9,7 @@ use std::sync::{Mutex, MutexGuard};
 /// it is fetched on demand via `get_raw_item` / `GetItemContent` for paste-back.
 /// Keeping the trim in SQL means a page of large text items costs a few KB of
 /// JSON, not megabytes, and the work stays in the daemon.
-const PREVIEW_CHARS: usize = 200;
+pub const PREVIEW_CHARS: usize = 200;
 
 /// Metadata for a clipboard entry - does NOT include thumbnail bytes.
 /// Thumbnails are fetched separately via `get_thumbnail` for lazy loading.
@@ -185,7 +185,7 @@ impl Db {
             "SELECT id, mime_type, substr(content_text, 1, {PREVIEW_CHARS}), source_app, created_at,
                     thumbnail_blob IS NOT NULL AS has_thumb
              FROM clipboard_history
-             ORDER BY created_at DESC
+             ORDER BY created_at DESC, rowid DESC
              LIMIT ?1 OFFSET ?2"
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -233,7 +233,7 @@ impl Db {
                     h.thumbnail_blob IS NOT NULL AS has_thumb
              FROM clipboard_history h
              WHERE h.rowid IN (SELECT rowid FROM clipboard_fts WHERE clipboard_fts MATCH ?1)
-             ORDER BY h.created_at DESC
+             ORDER BY h.created_at DESC, h.rowid DESC
              LIMIT ?2"
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -320,7 +320,7 @@ impl Db {
         let mut stmt = conn.prepare(
             "SELECT id FROM clipboard_history
              WHERE id NOT IN (
-                 SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1
+                 SELECT id FROM clipboard_history ORDER BY created_at DESC, rowid DESC LIMIT ?1
              )",
         )?;
         let ids: Vec<String> = stmt

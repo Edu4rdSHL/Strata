@@ -61,6 +61,12 @@ pub struct StrataManager {
 impl StrataManager {
     /// Called by the GJS extension when it detects a clipboard change via Meta.Selection.
     /// `content` is the raw bytes of the clipboard payload (D-Bus `ay`).
+    ///
+    /// Trust note: the password-manager hint (`x-kde-passwordManagerHint`) is
+    /// honored client-side by the extension before it ever calls this, but the
+    /// hint is not forwarded, so this method cannot re-check it. Treat callers of
+    /// `SubmitItem` as trusted (the session bus is per-user). Forwarding the
+    /// sensitivity flag to enforce it here is left for a future contract change.
     async fn submit_item(&self, mime_type: String, content: Vec<u8>) -> zbus::fdo::Result<()> {
         self.submit_tx
             .send(SubmitRequest {
@@ -205,6 +211,7 @@ impl StrataManager {
         max_history: u32,
         max_text_bytes: u32,
         max_image_bytes: u32,
+        #[zbus(signal_context)] ctx: SignalContext<'_>,
     ) -> zbus::fdo::Result<()> {
         use std::sync::atomic::Ordering;
         if max_history > 0 {
@@ -228,6 +235,23 @@ impl StrataManager {
             self.limits.max_text_bytes(),
             self.limits.max_image_bytes(),
         );
+
+        // Lowering max_history should shrink stored history immediately, not
+        // wait until the next copy triggers a prune. Prune now and emit
+        // ItemDeleted for each removed id so clients can drop their caches.
+        if max_history > 0 {
+            let db = self.db.clone();
+            let max = max_history as usize;
+            let pruned = tokio::task::spawn_blocking(move || db.prune(max))
+                .await
+                .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?
+                .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+            for id in &pruned {
+                if let Err(e) = Self::item_deleted(&ctx, id).await {
+                    tracing::warn!("Emitting ItemDeleted for pruned id={}: {}", id, e);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -244,7 +268,7 @@ impl StrataManager {
     // -----------------------------------------------------------------
 
     /// Emitted when a new item is stored (after dedup + thumbnail generation).
-    /// `preview` is a text excerpt (≤120 chars) for text items, or empty for
+    /// `preview` is a text excerpt (≤ PREVIEW_CHARS) for text items, or empty for
     /// images and other binary types - clients should call GetThumbnail(id) to
     /// fetch image thumbnails lazily.
     #[zbus(signal)]

@@ -54,12 +54,16 @@ async fn main() -> Result<()> {
         .await
         .context("Building D-Bus connection")?;
 
-    // Request the well-known name with ReplaceExisting so a new instance always
-    // wins the race against the outgoing instance during extension reload.
+    // Request the well-known name with ReplaceExisting (try to take it from any
+    // outgoing instance) AND AllowReplacement (let the next instance take it
+    // from us). Both are needed for a clean hand-off on extension reload: without
+    // AllowReplacement on the running instance, a new instance's ReplaceExisting
+    // would be refused.
     dbus_conn
         .request_name_with_flags(
             "org.gnome.Strata",
-            zbus::fdo::RequestNameFlags::ReplaceExisting.into(),
+            zbus::fdo::RequestNameFlags::ReplaceExisting
+                | zbus::fdo::RequestNameFlags::AllowReplacement,
         )
         .await
         .context("Acquiring D-Bus name org.gnome.Strata")?;
@@ -152,9 +156,7 @@ fn pick_mime(mimes: &[String]) -> Option<&str> {
         "image/webp",
         "image/bmp",
         "image/tiff",
-        "image/avif",
         "image/x-icon",
-        "image/svg+xml",
         // Plain text (UTF-8 preferred, then locale, then X11 legacy aliases).
         // Ranked above rich-text so editors that expose both text/plain and
         // text/html give us the raw source, not styled markup.
@@ -271,7 +273,10 @@ async fn process_bytes(
         (None, Some(raw_bytes), Some(thumb_bytes), String::new())
     } else {
         let text = String::from_utf8_lossy(&raw_bytes).into_owned();
-        let preview: String = text.chars().take(120).collect();
+        // Same preview length as the paginated/search queries (db::PREVIEW_CHARS),
+        // so a just-copied row and the same row after a reload carry identical
+        // text. `take` is lazy, so this never scans past the first N chars.
+        let preview: String = text.chars().take(db::PREVIEW_CHARS).collect();
         (Some(text), None, None, preview)
     };
 
