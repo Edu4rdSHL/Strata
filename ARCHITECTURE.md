@@ -71,6 +71,17 @@ The extension listens for `notify::g-name-owner` on the D-Bus proxy. When
 the daemon's `dev.edu4rdshl.Strata` name becomes owned, the panel triggers
 its initial fetch. No polling, no fixed delays.
 
+### Single instance
+
+Exactly one daemon should serve the bus name. Two layers enforce it: the
+extension skips spawning when `GetNameOwner` shows the name is already owned
+(so a daemon started out-of-band, e.g. via a systemd user service, is reused),
+and the daemon itself requests the name with `DoNotQueue` -- if the name is
+already taken it errors out and exits rather than queueing or stealing it.
+It deliberately does not use `ReplaceExisting`: taking the name from a running
+instance would orphan that instance (zbus does not terminate a replaced owner),
+so the late starter bows out instead.
+
 ## Ingest path
 
 ```
