@@ -35,7 +35,7 @@ together and the trade-offs at each layer.
 |                              |                       | SQLite (WAL, FTS5)  |  |
 |                              |                       +---------------------+  |
 |                              v                                                |
-|                   image::load_from_memory --> PNG thumbnail (~256 px)         |
+|                   image::load_from_memory --> PNG thumbnail (~200 px)         |
 |                                                                               |
 +-------------------------------------------------------------------------------+
 ```
@@ -129,7 +129,7 @@ CREATE TABLE clipboard_history (
     mime_type       TEXT NOT NULL,
     content_text    TEXT,                -- one of these two is populated
     content_blob    BLOB,                -- (text vs binary)
-    thumbnail_blob  BLOB,                -- pre-decoded PNG, ~256 px
+    thumbnail_blob  BLOB,                -- pre-decoded PNG, ~200 px
     content_hash    TEXT NOT NULL,       -- blake3 of raw bytes
     source_app      TEXT,
     created_at      INTEGER NOT NULL
@@ -239,9 +239,14 @@ page each time the scroll position comes within a fixed threshold (200 px)
 of the bottom. The Rust side serves these from the `idx_created_at DESC`
 index with `LIMIT/OFFSET`, which stays O(log n) for any history size.
 
-Search shortcuts this path: when the search box is non-empty the panel
-calls `SearchHistory(query, limit)` instead and disables scroll-driven
-appends, so an in-progress search and a scroll event cannot race.
+Search uses a parallel path: when the search box is non-empty the panel
+calls `SearchHistory(query, max-history)`, which returns the full match set
+(bounded by the configured history size, not an arbitrary cap). The panel
+snapshots those results and renders them lazily, a page at a time as you
+scroll -- the same paging mechanism as the recent view, but fed from the
+in-memory snapshot instead of re-querying. A search epoch plus a
+results-epoch guard discard stale renders, so a fast new query (or a scroll
+landing during a query's fetch) can never paint the previous query's rows.
 
 ### On-demand thumbnails
 
@@ -286,10 +291,14 @@ and `light.css` carries light overrides with every rule scoped under a
 `.strata-theme-light` ancestor class. That scoping makes each light rule
 strictly more specific than its dark counterpart, so it wins
 deterministically regardless of stylesheet load order. `extension.js` loads
-`light.css` into the St theme context once at `enable()` (and re-loads it on
-theme-context `changed`, since a Shell-theme swap drops dynamically loaded
-sheets); it does nothing until the panel adds the class. The panel resolves
-the effective theme from the `theme` setting (`auto` consults
+`light.css` into the St theme context once at `enable()` and unloads it on
+`disable()`; it does nothing until the panel adds the class. It deliberately
+does NOT subscribe to the theme context's `changed` signal: `load_stylesheet`
+itself emits `changed`, so reloading on it feeds back into itself and hits
+"too much recursion" (it fired on screen unlock, which restyles widgets). The
+trade-off of the one-time load is that a GNOME Shell theme switch drops the
+sheet until the extension is re-enabled. The panel resolves the effective
+theme from the `theme` setting (`auto` consults
 `org.gnome.desktop.interface color-scheme`) and toggles the class on its
 root box. Switching themes is one class toggle on an existing subtree, off
 the ingest/render hot paths.
