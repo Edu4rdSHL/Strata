@@ -288,20 +288,34 @@ St's CSS engine has no custom properties (`var()`) and no reliable
 `!important`, so the light theme is not a runtime-generated stylesheet.
 Instead `stylesheet.css` is the dark theme (default, auto-loaded by GNOME),
 and `light.css` carries light overrides with every rule scoped under a
-`.strata-theme-light` ancestor class. That scoping makes each light rule
-strictly more specific than its dark counterpart, so it wins
-deterministically regardless of stylesheet load order. `extension.js` loads
-`light.css` into the St theme context once at `enable()` and unloads it on
-`disable()`; it does nothing until the panel adds the class. It deliberately
-does NOT subscribe to the theme context's `changed` signal: `load_stylesheet`
-itself emits `changed`, so reloading on it feeds back into itself and hits
-"too much recursion" (it fired on screen unlock, which restyles widgets). The
-trade-off of the one-time load is that a GNOME Shell theme switch drops the
-sheet until the extension is re-enabled. The panel resolves the effective
-theme from the `theme` setting (`auto` consults
-`org.gnome.desktop.interface color-scheme`) and toggles the class on its
-root box. Switching themes is one class toggle on an existing subtree, off
-the ingest/render hot paths.
+`.strata-theme-light` ancestor class -- e.g. dark `.strata-panel { ... }` is
+overridden by `.strata-panel.strata-theme-light { ... }`. That scoping makes
+each light rule strictly more specific than its dark counterpart, so it wins
+deterministically regardless of stylesheet load order.
+
+The switch between themes is a single class. `extension.js` loads `light.css`
+into the St theme context once at `enable()` (and unloads it on `disable()`),
+but loading it changes nothing on screen: its rules are present in the engine
+yet match no actors, because nothing carries `.strata-theme-light` yet. The
+panel resolves the effective theme from the `theme` setting (`auto` consults
+`org.gnome.desktop.interface color-scheme`) and adds or removes that one class
+on its root box. With the class present the more-specific light rules win and
+the panel is light; with it absent only the base dark rules apply. So
+switching is one class toggle on an existing subtree -- instant, off the
+ingest/render hot paths, and needing no reload.
+
+`light.css` is loaded exactly once and the theme context's `changed` signal is
+deliberately not used: `load_stylesheet` itself emits `changed`, so reloading
+on it feeds back into itself and hits "too much recursion" (it fired on screen
+unlock, which restyles widgets). The one caveat of loading once is a full
+GNOME Shell *theme* switch (the User Themes extension swapping the whole Shell
+theme), which replaces the theme object and drops every dynamically loaded
+sheet, including `light.css`. After that, light mode falls back to the dark
+base rules until the extension is re-enabled; dark mode is unaffected because
+GNOME re-loads `stylesheet.css` itself. This is rare and recoverable, and far
+preferable to re-subscribing to `changed`. The ordinary light/dark switch
+(including the system Settings light/dark that `auto` follows) is just the
+class toggle and is unaffected.
 
 ## Wayland clipboard monitor
 
