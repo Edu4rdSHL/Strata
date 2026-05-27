@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.8.0] - 2026-05-26
+
+### Changed
+
+- Upgraded daemon dependencies: zbus 4 -> 5, rusqlite 0.31 -> 0.40, dirs 5 -> 6.
+
+### Fixed
+
+- Single-instance daemon: the bus name is now requested with `DoNotQueue`
+  instead of `ReplaceExisting | AllowReplacement`. If the name is already owned
+  the daemon exits cleanly instead of (a) running without owning it (zbus 5
+  returns `InQueue` as `Ok`) or (b) stealing the name and leaving the previous
+  instance running as an orphan (zbus does not terminate a replaced owner).
+- Real SQLite errors are no longer swallowed as "not found": `upsert_item`'s
+  dedup lookup and `get_thumbnail` / `get_raw_item` now distinguish a missing
+  row (`Ok(None)`) from a genuine error (propagated), via `optional()`.
+- Daemon supervisor: a guard prevents spawning two daemons when an in-flight
+  name-owner check overlaps a backoff retry, and the exit handler ignores
+  foreign/stale subprocess exits so restart accounting can't be corrupted.
+- Panel: clearing history (or a `HistoryCleared` signal) now invalidates the
+  active search snapshot, so scrolling can't render stale rows; the
+  scroll-into-view idle is guarded against a destroyed panel.
+
+### Internal
+
+- clippy pedantic/nursery cleanup across the daemon (format args, redundant
+  clone, pass-by-reference, doc backticks), with `#[allow]` + rationale for the
+  intentional lints (the single-writer lock hold, zbus interface `async`).
+
+---
+
 ## [0.7.0] - 2026-05-26
 
 ### Fixed
