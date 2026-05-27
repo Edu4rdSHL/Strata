@@ -54,19 +54,21 @@ async fn main() -> Result<()> {
         .await
         .context("Building D-Bus connection")?;
 
-    // Request the well-known name with ReplaceExisting (try to take it from any
-    // outgoing instance) AND AllowReplacement (let the next instance take it
-    // from us). Both are needed for a clean hand-off on extension reload: without
-    // AllowReplacement on the running instance, a new instance's ReplaceExisting
-    // would be refused.
+    // Single-instance daemon: request the name with DoNotQueue. The extension
+    // spawns exactly one daemon and skips spawning if the name is already owned,
+    // so if the name IS taken here, another instance is already serving - the
+    // request returns an error (rather than silently queuing, which would leave
+    // us running without owning the name while clients talk to the other one)
+    // and we exit. We deliberately do NOT use ReplaceExisting: stealing the name
+    // would orphan the running instance (zbus does not terminate a replaced
+    // owner), so we let the existing one keep it and bow out.
     dbus_conn
         .request_name_with_flags(
             "dev.edu4rdshl.Strata",
-            zbus::fdo::RequestNameFlags::ReplaceExisting
-                | zbus::fdo::RequestNameFlags::AllowReplacement,
+            zbus::fdo::RequestNameFlags::DoNotQueue.into(),
         )
         .await
-        .context("Acquiring D-Bus name dev.edu4rdshl.Strata")?;
+        .context("Acquiring D-Bus name dev.edu4rdshl.Strata (is another instance running?)")?;
 
     tracing::info!("D-Bus service registered as dev.edu4rdshl.Strata");
 
@@ -76,11 +78,12 @@ async fn main() -> Result<()> {
     // so this fails to bind there and the extension feeds content via SubmitItem
     // instead. On wlroots compositors (Sway, Hyprland) the monitor is the path.
     // -----------------------------------------------------------------------
-    match clipboard::monitor::spawn(clip_tx) {
-        Ok(()) => tracing::info!("Wayland clipboard monitor started"),
-        Err(_) => tracing::info!(
+    if clipboard::monitor::spawn(clip_tx).is_ok() {
+        tracing::info!("Wayland clipboard monitor started");
+    } else {
+        tracing::info!(
             "Wayland clipboard monitor unavailable, using GJS Meta.Selection path (expected on GNOME)"
-        ),
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -198,12 +201,11 @@ async fn process_change(
         tracing::debug!("Skipping clipboard change marked as sensitive");
         return Ok(());
     }
-    let mime = match pick_mime(mime_types) {
-        Some(m) => m.to_string(),
-        None => {
-            tracing::debug!("No usable MIME type in {:?}", mime_types);
-            return Ok(());
-        }
+    let mime = if let Some(m) = pick_mime(mime_types) {
+        m.to_string()
+    } else {
+        tracing::debug!("No usable MIME type in {:?}", mime_types);
+        return Ok(());
     };
 
     tracing::debug!("Processing Wayland clipboard change, MIME: {}", mime);
@@ -316,12 +318,12 @@ async fn process_bytes(
             .await
             .context("Getting StrataManager interface ref")?;
 
-        StrataManager::item_added(iface.signal_context(), &id, &mime, &preview)
+        StrataManager::item_added(iface.signal_emitter(), &id, &mime, &preview)
             .await
             .context("Emitting ItemAdded signal")?;
 
         for pid in &pruned_ids {
-            if let Err(e) = StrataManager::item_deleted(iface.signal_context(), pid).await {
+            if let Err(e) = StrataManager::item_deleted(iface.signal_emitter(), pid).await {
                 tracing::warn!("Emitting ItemDeleted for pruned id={}: {}", pid, e);
             }
         }

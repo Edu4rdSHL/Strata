@@ -1,5 +1,11 @@
+// SQLite is single-writer, and `lock_conn`'s guard is intentionally held for
+// each function's whole body -- the upsert's SELECT-then-INSERT must be atomic
+// under one lock. `significant_drop_tightening` would have us drop the guard
+// earlier, which would break that guarantee, so it is allowed for this module.
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
@@ -21,11 +27,11 @@ pub struct ItemMeta {
     pub content_text: Option<String>,
     pub source_app: Option<String>,
     pub created_at: i64,
-    /// True if this item has a stored thumbnail (clients should call get_thumbnail to fetch it).
+    /// True if this item has a stored thumbnail (clients should call `get_thumbnail` to fetch it).
     pub has_thumbnail: bool,
 }
 
-/// A row as stored in SQLite (blob is raw bytes, not base64).
+/// A row as stored in `SQLite` (blob is raw bytes, not base64).
 #[allow(dead_code)]
 pub struct RawItem {
     pub id: String,
@@ -43,12 +49,12 @@ pub struct Db {
 
 /// Acquire the DB lock, transparently recovering from poison.
 ///
-/// A mutex is "poisoned" when a thread panics while holding it. For our SQLite
+/// A mutex is "poisoned" when a thread panics while holding it. For our `SQLite`
 /// connection this is safe to recover from because rusqlite uses RAII statements
 /// and transactions - any in-flight statement or transaction has already been
 /// rolled back by the time the panic unwinds past it. Without this recovery,
 /// a single panic anywhere in the daemon would permanently break ALL future
-/// database access (every subsequent .lock().unwrap() would panic too).
+/// database access (every subsequent .`lock().unwrap()` would panic too).
 fn lock_conn(m: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
     match m.lock() {
         Ok(g) => g,
@@ -62,7 +68,7 @@ fn lock_conn(m: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
-            .with_context(|| format!("Opening SQLite database at {:?}", path))?;
+            .with_context(|| format!("Opening SQLite database at {}", path.display()))?;
 
         // Performance pragmas: WAL mode for concurrent reads, synchronous=NORMAL is safe
         // for a clipboard history (we can tolerate losing the last item on a crash).
@@ -140,14 +146,18 @@ impl Db {
         let conn = lock_conn(&self.conn);
         let now_ms = chrono_now_ms();
 
-        // Check for existing item with this hash.
+        // Check for existing item with this hash. optional() maps "no match" to
+        // None; a real read error propagates instead of being swallowed (which
+        // would make a duplicate look new and then fail the INSERT on the UNIQUE
+        // index with a confusing error).
         let existing: Option<String> = conn
             .query_row(
                 "SELECT id FROM clipboard_history WHERE content_hash = ?1",
                 params![content_hash],
                 |row| row.get(0),
             )
-            .ok();
+            .optional()
+            .context("Checking for existing item")?;
 
         if let Some(id) = existing {
             conn.execute(
@@ -206,9 +216,9 @@ impl Db {
         Ok(items)
     }
 
-    /// Full-text search over content_text. Only text items can match - images
+    /// Full-text search over `content_text`. Only text items can match - images
     /// and other non-text content are NOT indexed and never appear in results.
-    /// Empty query returns []; callers should use get_history_page for that.
+    /// Empty query returns []; callers should use `get_history_page` for that.
     pub fn search_history(&self, query: &str, limit: usize) -> Result<Vec<ItemMeta>> {
         let conn = lock_conn(&self.conn);
 
@@ -219,7 +229,7 @@ impl Db {
             .map(|t| {
                 // Escape embedded double-quotes by doubling them per FTS5 syntax.
                 let escaped = t.replace('"', "\"\"");
-                format!("\"{}\"*", escaped)
+                format!("\"{escaped}\"*")
             })
             .collect();
 
@@ -258,39 +268,43 @@ impl Db {
     /// (text item, or doesn't exist).
     pub fn get_thumbnail(&self, id: &str) -> Result<Option<Vec<u8>>> {
         let conn = lock_conn(&self.conn);
-        let blob: Option<Option<Vec<u8>>> = conn
+        // thumbnail_blob is itself nullable, so the row yields Option<Vec<u8>>.
+        // optional() maps a missing row to Ok(None); real errors propagate.
+        let blob = conn
             .query_row(
                 "SELECT thumbnail_blob FROM clipboard_history WHERE id = ?1",
                 params![id],
-                |row| row.get(0),
+                |row| row.get::<_, Option<Vec<u8>>>(0),
             )
-            .ok();
+            .optional()
+            .context("Fetching thumbnail")?;
         Ok(blob.flatten())
     }
 
     /// Fetch raw item content for clipboard write-back. Does not load
-    /// thumbnail_blob -- callers only need the original payload.
+    /// `thumbnail_blob` -- callers only need the original payload.
     pub fn get_raw_item(&self, id: &str) -> Result<Option<RawItem>> {
         let conn = lock_conn(&self.conn);
-        let result = conn
-            .query_row(
-                "SELECT id, mime_type, content_text, content_blob, source_app, created_at
+        // optional() maps a missing row to Ok(None); real errors propagate
+        // instead of being silently swallowed as "not found".
+        conn.query_row(
+            "SELECT id, mime_type, content_text, content_blob, source_app, created_at
              FROM clipboard_history WHERE id = ?1",
-                params![id],
-                |row| {
-                    Ok(RawItem {
-                        id: row.get(0)?,
-                        mime_type: row.get(1)?,
-                        content_text: row.get(2)?,
-                        content_blob: row.get(3)?,
-                        thumbnail_blob: None,
-                        source_app: row.get(4)?,
-                        created_at: row.get(5)?,
-                    })
-                },
-            )
-            .ok();
-        Ok(result)
+            params![id],
+            |row| {
+                Ok(RawItem {
+                    id: row.get(0)?,
+                    mime_type: row.get(1)?,
+                    content_text: row.get(2)?,
+                    content_blob: row.get(3)?,
+                    thumbnail_blob: None,
+                    source_app: row.get(4)?,
+                    created_at: row.get(5)?,
+                })
+            },
+        )
+        .optional()
+        .context("Fetching clipboard item")
     }
 
     pub fn delete_item(&self, id: &str) -> Result<bool> {
@@ -306,7 +320,7 @@ impl Db {
     }
 
     /// Prune history to `max_history` most recent items. Returns the IDs of
-    /// items that were deleted, so the caller can emit ItemDeleted signals
+    /// items that were deleted, so the caller can emit `ItemDeleted` signals
     /// (lets clients clean up per-item caches like thumbnail files).
     pub fn prune(&self, max_history: usize) -> Result<Vec<String>> {
         let conn = lock_conn(&self.conn);
@@ -331,10 +345,7 @@ impl Db {
         }
         // Delete by collected IDs so the ORDER BY subquery runs only once.
         let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-        let sql = format!(
-            "DELETE FROM clipboard_history WHERE id IN ({})",
-            placeholders
-        );
+        let sql = format!("DELETE FROM clipboard_history WHERE id IN ({placeholders})");
         conn.execute(&sql, rusqlite::params_from_iter(ids.iter()))?;
         Ok(ids)
     }

@@ -1,22 +1,22 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use zbus::{interface, object_server::SignalContext};
+use zbus::{interface, object_server::SignalEmitter};
 
 use crate::db::{Db, RawItem};
 
 /// Maximum thumbnail dimension for images (px). Larger images are resized down.
 pub const THUMB_PX: u32 = 200;
-/// Default maximum raw image size to accept (bytes). Overridable via SetConfig.
+/// Default maximum raw image size to accept (bytes). Overridable via `SetConfig`.
 pub const DEFAULT_MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
-/// Default maximum text size to accept. Overridable via SetConfig.
+/// Default maximum text size to accept. Overridable via `SetConfig`.
 pub const DEFAULT_MAX_TEXT_BYTES: usize = 1024 * 1024;
-/// Default maximum history item count. Overridable via SetConfig.
+/// Default maximum history item count. Overridable via `SetConfig`.
 pub const DEFAULT_MAX_HISTORY: usize = 200;
 
 /// Runtime-configurable limits shared between the D-Bus service and the
 /// clipboard processing tasks. All three are read on every ingest / prune
-/// call, so updates via SetConfig take effect immediately.
+/// call, so updates via `SetConfig` take effect immediately.
 #[derive(Clone)]
 pub struct Limits {
     pub max_history: Arc<AtomicUsize>,
@@ -67,6 +67,8 @@ impl StrataManager {
     /// hint is not forwarded, so this method cannot re-check it. Treat callers of
     /// `SubmitItem` as trusted (the session bus is per-user). Forwarding the
     /// sensitivity flag to enforce it here is left for a future contract change.
+    // async is required by the zbus #[interface] method signature, not by the body.
+    #[allow(clippy::unused_async)]
     async fn submit_item(&self, mime_type: String, content: Vec<u8>) -> zbus::fdo::Result<()> {
         self.submit_tx
             .send(SubmitRequest {
@@ -76,8 +78,8 @@ impl StrataManager {
             .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
     /// Return a page of recent items as JSON metadata (no inline thumbnail bytes,
-    /// content_text truncated to a preview). Clients call GetThumbnail(id) lazily
-    /// for items with has_thumbnail=true and GetItemContent(id) for full content.
+    /// `content_text` truncated to a preview). Clients call GetThumbnail(id) lazily
+    /// for items with `has_thumbnail=true` and GetItemContent(id) for full content.
     /// `offset` is from the most recent item (0 = newest).
     async fn get_history(&self, offset: u32, limit: u32) -> zbus::fdo::Result<String> {
         let db = self.db.clone();
@@ -93,7 +95,7 @@ impl StrataManager {
     }
 
     /// Full-text search across the entire DB. Empty query returns []; callers
-    /// should fall back to GetHistory in that case.
+    /// should fall back to `GetHistory` in that case.
     async fn search_history(&self, query: String, limit: u32) -> zbus::fdo::Result<String> {
         let db = self.db.clone();
         let items = tokio::task::spawn_blocking(move || db.search_history(&query, limit as usize))
@@ -173,7 +175,7 @@ impl StrataManager {
     async fn delete_item(
         &self,
         id: String,
-        #[zbus(signal_context)] ctx: SignalContext<'_>,
+        #[zbus(signal_context)] ctx: SignalEmitter<'_>,
     ) -> zbus::fdo::Result<()> {
         let db = self.db.clone();
         let id_clone = id.clone();
@@ -190,7 +192,7 @@ impl StrataManager {
     /// Remove all items from history.
     async fn clear_history(
         &self,
-        #[zbus(signal_context)] ctx: SignalContext<'_>,
+        #[zbus(signal_context)] ctx: SignalEmitter<'_>,
     ) -> zbus::fdo::Result<()> {
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || db.clear_history())
@@ -204,14 +206,14 @@ impl StrataManager {
     }
 
     /// Push runtime limits from the front-end. Takes effect immediately.
-    /// All three values are absolute (max_text and max_image are bytes,
+    /// All three values are absolute (`max_text` and `max_image` are bytes,
     /// not MB). 0 means "leave unchanged" for that field.
     async fn set_config(
         &self,
         max_history: u32,
         max_text_bytes: u32,
         max_image_bytes: u32,
-        #[zbus(signal_context)] ctx: SignalContext<'_>,
+        #[zbus(signal_context)] ctx: SignalEmitter<'_>,
     ) -> zbus::fdo::Result<()> {
         use std::sync::atomic::Ordering;
         if max_history > 0 {
@@ -256,6 +258,8 @@ impl StrataManager {
     }
 
     /// Gracefully shut down the daemon.
+    // async is required by the zbus #[interface] method signature, not by the body.
+    #[allow(clippy::unused_async)]
     async fn shutdown(&self) {
         tracing::info!("Shutdown requested via D-Bus");
         // Signal the main loop to exit. The reply is sent before the process exits
@@ -268,12 +272,12 @@ impl StrataManager {
     // -----------------------------------------------------------------
 
     /// Emitted when a new item is stored (after dedup + thumbnail generation).
-    /// `preview` is a text excerpt (≤ PREVIEW_CHARS) for text items, or empty for
+    /// `preview` is a text excerpt (≤ `PREVIEW_CHARS`) for text items, or empty for
     /// images and other binary types - clients should call GetThumbnail(id) to
     /// fetch image thumbnails lazily.
     #[zbus(signal)]
     pub async fn item_added(
-        ctx: &SignalContext<'_>,
+        ctx: &SignalEmitter<'_>,
         id: &str,
         mime_type: &str,
         preview: &str,
@@ -281,9 +285,9 @@ impl StrataManager {
 
     /// Emitted when an item is removed.
     #[zbus(signal)]
-    pub async fn item_deleted(ctx: &SignalContext<'_>, id: &str) -> zbus::Result<()>;
+    pub async fn item_deleted(ctx: &SignalEmitter<'_>, id: &str) -> zbus::Result<()>;
 
     /// Emitted when the entire history is cleared.
     #[zbus(signal)]
-    pub async fn history_cleared(ctx: &SignalContext<'_>) -> zbus::Result<()>;
+    pub async fn history_cleared(ctx: &SignalEmitter<'_>) -> zbus::Result<()>;
 }

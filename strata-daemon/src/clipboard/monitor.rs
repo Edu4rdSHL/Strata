@@ -1,7 +1,7 @@
 /// Wayland clipboard monitor using the ext-data-control-v1 protocol with a
 /// zwlr-data-control-v1 fallback for wlroots-based compositors. GNOME's Mutter
 /// exposes neither, so on GNOME this monitor does not bind and clipboard
-/// content arrives from the extension via Meta.Selection + SubmitItem.
+/// content arrives from the extension via Meta.Selection + `SubmitItem`.
 ///
 /// Runs on a dedicated OS thread (NOT on the tokio runtime) to avoid blocking
 /// the async executor. Communicates clipboard change events to the tokio world
@@ -59,9 +59,9 @@ impl MonitorState {
         self.offers.entry(id).or_default().push(mime);
     }
 
-    fn commit_selection(&mut self, offer_id: ObjectId) {
+    fn commit_selection(&mut self, offer_id: &ObjectId) {
         // Take the mime list for this offer (and discard stale in-flight offers).
-        let mimes = self.offers.remove(&offer_id).unwrap_or_default();
+        let mimes = self.offers.remove(offer_id).unwrap_or_default();
         self.offers.clear(); // discard any superseded offers
         if !mimes.is_empty() {
             let _ = self.tx.send(ClipboardChange { mime_types: mimes });
@@ -119,7 +119,7 @@ impl Dispatch<ExtDataControlDeviceV1, ()> for MonitorState {
             }
             ext_data_control_device_v1::Event::Selection { id: Some(offer) } => {
                 let oid = offer.id();
-                state.commit_selection(oid);
+                state.commit_selection(&oid);
                 // Politely destroy the offer - the compositor will clean up
                 // the Wayland object.
                 offer.destroy();
@@ -183,7 +183,7 @@ impl Dispatch<ZwlrDataControlDeviceV1, ()> for MonitorState {
             }
             zwlr_data_control_device_v1::Event::Selection { id: Some(offer) } => {
                 let oid = offer.id();
-                state.commit_selection(oid);
+                state.commit_selection(&oid);
                 offer.destroy();
             }
             zwlr_data_control_device_v1::Event::Selection { id: None } => {
@@ -233,7 +233,7 @@ pub fn spawn(tx: UnboundedSender<ClipboardChange>) -> Result<()> {
     std::thread::Builder::new()
         .name("strata-wl-monitor".into())
         .spawn(move || {
-            if let Err(e) = run_loop(conn, protocol, tx) {
+            if let Err(e) = run_loop(&conn, protocol, tx) {
                 tracing::error!("Clipboard monitor exited with error: {e:#}");
             }
         })?;
@@ -278,11 +278,11 @@ fn probe_protocol(conn: &Connection) -> Result<Protocol> {
 }
 
 fn run_loop(
-    conn: Connection,
+    conn: &Connection,
     protocol: Protocol,
     tx: UnboundedSender<ClipboardChange>,
 ) -> Result<()> {
-    let (globals, mut queue) = registry_queue_init::<MonitorState>(&conn)?;
+    let (globals, mut queue) = registry_queue_init::<MonitorState>(conn)?;
     let qh = queue.handle();
     let mut state = MonitorState::new(tx);
 

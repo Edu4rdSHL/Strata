@@ -22,7 +22,7 @@ pub fn write_to_clipboard(req: WriteRequest) -> Result<()> {
         vec![
             MimeSource {
                 source: Source::Bytes(bytes.clone().into()),
-                mime_type: MimeType::Specific(mime.clone()),
+                mime_type: MimeType::Specific(mime),
             },
             MimeSource {
                 source: Source::Bytes(bytes.into()),
