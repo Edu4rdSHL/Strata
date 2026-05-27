@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="Liberation Sans, DejaVu Sans, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232323"/>
+      <stop offset="1" stop-color="#181818"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- staggered strata mark, scaled from the 64-unit logo -->
+  <g transform="translate(130,150) scale(5.4)">
+    <rect x="8"  y="13" width="38" height="10" rx="3" fill="#62a0ea"/>
+    <rect x="14" y="27" width="38" height="10" rx="3" fill="#3584e4"/>
+    <rect x="20" y="41" width="38" height="10" rx="3" fill="#1a5fb4"/>
+  </g>
+
+  <!-- wordmark + tagline -->
+  <text x="500" y="305" font-size="140" font-weight="700" fill="#ffffff">Strata</text>
+  <text x="505" y="368" font-size="34" fill="#bcbcbc">Stutter-free clipboard history for GNOME</text>
+  <text x="505" y="414" font-size="29" fill="#6f6f6f">JS draws, Rust thinks.</text>
+</svg>

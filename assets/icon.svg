@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Strata">
+  <!-- App-icon variant: staggered strata layers on a rounded dark square. -->
+  <rect width="64" height="64" rx="14" fill="#1e1e1e"/>
+  <rect x="10" y="15"   width="34" height="9" rx="3" fill="#62a0ea"/>
+  <rect x="15" y="27.5" width="34" height="9" rx="3" fill="#3584e4"/>
+  <rect x="20" y="40"   width="34" height="9" rx="3" fill="#1a5fb4"/>
+</svg>

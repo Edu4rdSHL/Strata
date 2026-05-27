@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Strata">
+  <!-- Staggered strata layers (also a clipboard-history stack). -->
+  <rect x="8"  y="13" width="38" height="10" rx="3" fill="#62a0ea"/>
+  <rect x="14" y="27" width="38" height="10" rx="3" fill="#3584e4"/>
+  <rect x="20" y="41" width="38" height="10" rx="3" fill="#1a5fb4"/>
+</svg>

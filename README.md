@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.svg" alt="Strata logo" width="96" height="96">
+</p>
+
 # Strata
 
 A fast, stutter-free clipboard manager for GNOME Shell.
