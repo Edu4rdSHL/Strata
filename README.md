@@ -36,6 +36,32 @@ GNOME Shell (GJS)  ──D-Bus──▶  strata-daemon  ──▶  SQLite (~/.lo
 
 ## Install
 
+### Arch Linux (AUR)
+
+Strata is split into a daemon package and an extension package; install both.
+Two channels are available -- pick one channel and don't mix them:
+
+- **Stable (tagged releases):** `strata-daemon` + `gnome-shell-extension-strata`
+- **Git (latest `main`):** `strata-daemon-git` + `gnome-shell-extension-strata-git`
+
+```sh
+# Stable
+paru -S strata-daemon gnome-shell-extension-strata
+
+# or Git
+paru -S strata-daemon-git gnome-shell-extension-strata-git
+```
+
+(Use your AUR helper of choice, e.g. `yay` instead of `paru`.) Then log out /
+log back in (Wayland) or `Alt+F2` → `r` (X11) and enable:
+
+```sh
+gnome-extensions enable strata@edu4rdshl.dev
+```
+
+The daemon is installed to `/usr/bin/strata-daemon` (already in `$PATH`), so
+the extension finds it automatically.
+
 ### From source (local build)
 
 ```sh
