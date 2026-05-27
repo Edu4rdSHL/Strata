@@ -12,7 +12,7 @@ Strata is **two components**, and you need **both** for it to work:
 
 | Component | Language | Role |
 |---|---|---|
-| [`strata-daemon/`](strata-daemon/) | Rust + tokio + zbus | Storage (SQLite + FTS5), dedup, thumbnails, D-Bus service `org.gnome.Strata` |
+| [`strata-daemon/`](strata-daemon/) | Rust + tokio + zbus | Storage (SQLite + FTS5), dedup, thumbnails, D-Bus service `dev.edu4rdshl.Strata` |
 | [`strata@edu4rdshl.dev/`](strata@edu4rdshl.dev/) | GJS (GNOME Shell extension) | Top-bar panel, search UI, paste-back, clipboard ingest |
 
 The extension auto-connects to the daemon on enable. If the daemon is managed

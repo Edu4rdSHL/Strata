@@ -440,7 +440,7 @@ export default class StrataExtension extends Extension {
     _connectSignals() {
         this._itemAddedId = Gio.DBus.session.signal_subscribe(
             BUS_NAME,
-            'org.gnome.Strata.Manager',
+            'dev.edu4rdshl.Strata.Manager',
             'ItemAdded',
             OBJECT_PATH,
             null,
@@ -450,7 +450,7 @@ export default class StrataExtension extends Extension {
 
         this._itemDeletedId = Gio.DBus.session.signal_subscribe(
             BUS_NAME,
-            'org.gnome.Strata.Manager',
+            'dev.edu4rdshl.Strata.Manager',
             'ItemDeleted',
             OBJECT_PATH,
             null,
@@ -473,7 +473,7 @@ export default class StrataExtension extends Extension {
 
         this._historyClearedId = Gio.DBus.session.signal_subscribe(
             BUS_NAME,
-            'org.gnome.Strata.Manager',
+            'dev.edu4rdshl.Strata.Manager',
             'HistoryCleared',
             OBJECT_PATH,
             null,
@@ -600,22 +600,23 @@ export default class StrataExtension extends Extension {
     }
 
 
-    /** Load light.css into the global St theme context. Scoped under
-     *  `.strata-theme-light`, so it does nothing until the panel adds that
-     *  class. Reloaded on theme-context changes (a Shell-theme switch drops
-     *  dynamically loaded stylesheets). */
+    /** Load light.css into the global St theme context ONCE. It is scoped under
+     *  `.strata-theme-light`, so it stays inert until the panel adds that class
+     *  (dark/light switching is the panel's class toggle, independent of this).
+     *
+     *  We deliberately do NOT subscribe to the theme context's 'changed'
+     *  signal: load_stylesheet itself emits 'changed', so reloading on it feeds
+     *  back into itself and hits "too much recursion" (it fired on screen
+     *  unlock, which restyles widgets). The only thing a one-time load gives up
+     *  is re-applying after a GNOME Shell *theme* switch (which replaces the
+     *  St.Theme and drops this sheet) - a rare action, recoverable by toggling
+     *  the extension. That trade is worth never touching the signal. */
     _loadThemeStylesheet() {
         try {
             const themeContext = St.ThemeContext.get_for_stage(global.stage);
             this._lightCssFile = this.dir.get_child('light.css');
-            themeContext.get_theme().load_stylesheet(this._lightCssFile);
-            this._stThemeChangedId = themeContext.connect('changed', () => {
-                try {
-                    themeContext.get_theme().load_stylesheet(this._lightCssFile);
-                } catch (e) {
-                    console.error('[Strata] light.css reload failed:', e);
-                }
-            });
+            this._stTheme = themeContext.get_theme();
+            this._stTheme.load_stylesheet(this._lightCssFile);
         } catch (e) {
             console.error('[Strata] Failed to load light.css:', e);
         }
@@ -623,16 +624,11 @@ export default class StrataExtension extends Extension {
 
     _unloadThemeStylesheet() {
         try {
-            const themeContext = St.ThemeContext.get_for_stage(global.stage);
-            if (this._stThemeChangedId) {
-                themeContext.disconnect(this._stThemeChangedId);
-                this._stThemeChangedId = null;
-            }
-            if (this._lightCssFile)
-                themeContext.get_theme().unload_stylesheet(this._lightCssFile);
+            this._stTheme?.unload_stylesheet(this._lightCssFile);
         } catch (e) {
             console.error('[Strata] Failed to unload light.css:', e);
         }
+        this._stTheme = null;
         this._lightCssFile = null;
     }
 }

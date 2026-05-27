@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
     };
 
     let dbus_conn = zbus::connection::Builder::session()?
-        .serve_at("/org/gnome/Strata", manager)?
+        .serve_at("/dev/edu4rdshl/Strata", manager)?
         .build()
         .await
         .context("Building D-Bus connection")?;
@@ -61,14 +61,14 @@ async fn main() -> Result<()> {
     // would be refused.
     dbus_conn
         .request_name_with_flags(
-            "org.gnome.Strata",
+            "dev.edu4rdshl.Strata",
             zbus::fdo::RequestNameFlags::ReplaceExisting
                 | zbus::fdo::RequestNameFlags::AllowReplacement,
         )
         .await
-        .context("Acquiring D-Bus name org.gnome.Strata")?;
+        .context("Acquiring D-Bus name dev.edu4rdshl.Strata")?;
 
-    tracing::info!("D-Bus service registered as org.gnome.Strata");
+    tracing::info!("D-Bus service registered as dev.edu4rdshl.Strata");
 
     // -----------------------------------------------------------------------
     // Clipboard monitor (Wayland protocols - optional, soft-fail on GNOME).
@@ -312,7 +312,7 @@ async fn process_bytes(
     if is_new {
         let iface = conn
             .object_server()
-            .interface::<_, StrataManager>("/org/gnome/Strata")
+            .interface::<_, StrataManager>("/dev/edu4rdshl/Strata")
             .await
             .context("Getting StrataManager interface ref")?;
 

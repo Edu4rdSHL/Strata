@@ -24,7 +24,7 @@ together and the trade-offs at each layer.
 |        | ItemAdded / ItemDeleted / HistoryCleared                                |
 +--------+-------------------------------------------------------------------------+
          |
-         | session D-Bus (org.gnome.Strata)
+         | session D-Bus (dev.edu4rdshl.Strata)
          v
 +----------------------- strata-daemon (Rust process) --------------------------+
 |                                                                               |
@@ -68,7 +68,7 @@ hot ingest path (it fires `SubmitItem` and returns immediately).
 ### Startup
 
 The extension listens for `notify::g-name-owner` on the D-Bus proxy. When
-the daemon's `org.gnome.Strata` name becomes owned, the panel triggers
+the daemon's `dev.edu4rdshl.Strata` name becomes owned, the panel triggers
 its initial fetch. No polling, no fixed delays.
 
 ## Ingest path
@@ -313,7 +313,7 @@ and it is small and isolated.
 | App to history | Password leak | `x-kde-passwordManagerHint` opt-out |
 | User to search | SQL injection | rusqlite `params![]`, FTS5 input bound as value |
 | Daemon to FS | Path traversal via id | Ids are server-generated UUID v4 |
-| Daemon to extension | Signal spoofing | D-Bus enforces single owner of `org.gnome.Strata` |
+| Daemon to extension | Signal spoofing | D-Bus enforces single owner of `dev.edu4rdshl.Strata` |
 | Stored item to paste | Command execution | No spawn, no launch_uri, no markup parsing |
 
 ## Non-GNOME front-end

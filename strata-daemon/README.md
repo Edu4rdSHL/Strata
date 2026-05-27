@@ -24,9 +24,9 @@ manually if you're using a non-GNOME front-end.
 
 ## D-Bus interface
 
-- **Bus name:** `org.gnome.Strata`
-- **Object path:** `/org/gnome/Strata`
-- **Interface:** `org.gnome.Strata.Manager`
+- **Bus name:** `dev.edu4rdshl.Strata`
+- **Object path:** `/dev/edu4rdshl/Strata`
+- **Interface:** `dev.edu4rdshl.Strata.Manager`
 
 | Member | Signature | Notes |
 |---|---|---|
@@ -51,15 +51,15 @@ manually if you're using a non-GNOME front-end.
 ./target/release/strata-daemon
 
 # In another terminal:
-busctl --user call org.gnome.Strata /org/gnome/Strata \
-       org.gnome.Strata.Manager GetHistory uu 0 10
+busctl --user call dev.edu4rdshl.Strata /dev/edu4rdshl/Strata \
+       dev.edu4rdshl.Strata.Manager GetHistory uu 0 10
 
 # Submit text:
-busctl --user call org.gnome.Strata /org/gnome/Strata \
-       org.gnome.Strata.Manager SubmitItem say "text/plain;charset=utf-8" 5 104 101 108 108 111
+busctl --user call dev.edu4rdshl.Strata /dev/edu4rdshl/Strata \
+       dev.edu4rdshl.Strata.Manager SubmitItem say "text/plain;charset=utf-8" 5 104 101 108 108 111
 
 # Listen for new items:
-busctl --user monitor org.gnome.Strata
+busctl --user monitor dev.edu4rdshl.Strata
 ```
 
 ## Supported clipboard payloads

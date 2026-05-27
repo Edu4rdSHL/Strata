@@ -10,7 +10,7 @@ import Gio from 'gi://Gio';
 
 const STRATA_IFACE_XML = `
 <node>
-  <interface name="org.gnome.Strata.Manager">
+  <interface name="dev.edu4rdshl.Strata.Manager">
 
     <method name="GetHistory">
       <arg type="u" direction="in"  name="offset"/>
@@ -75,5 +75,5 @@ const STRATA_IFACE_XML = `
 
 export const StrataProxy = Gio.DBusProxy.makeProxyWrapper(STRATA_IFACE_XML);
 
-export const BUS_NAME    = 'org.gnome.Strata';
-export const OBJECT_PATH = '/org/gnome/Strata';
+export const BUS_NAME    = 'dev.edu4rdshl.Strata';
+export const OBJECT_PATH = '/dev/edu4rdshl/Strata';

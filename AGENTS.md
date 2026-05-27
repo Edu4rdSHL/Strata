@@ -72,7 +72,7 @@ ssh fedoradev 'glib-compile-schemas ~/.local/share/gnome-shell/extensions/strata
 
 ## D-Bus interface summary
 
-Service `org.gnome.Strata`, object `/org/gnome/Strata`, interface `org.gnome.Strata.Manager`.
+Service `dev.edu4rdshl.Strata`, object `/dev/edu4rdshl/Strata`, interface `dev.edu4rdshl.Strata.Manager`.
 
 Methods: `GetHistory(offset u32, limit u32) -> json s`,
 `SearchHistory(query s, limit u32) -> json s`,

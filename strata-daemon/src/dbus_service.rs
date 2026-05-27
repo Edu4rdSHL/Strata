@@ -57,7 +57,7 @@ pub struct StrataManager {
     pub shutdown_tx: tokio::sync::mpsc::UnboundedSender<()>,
 }
 
-#[interface(name = "org.gnome.Strata.Manager")]
+#[interface(name = "dev.edu4rdshl.Strata.Manager")]
 impl StrataManager {
     /// Called by the GJS extension when it detects a clipboard change via Meta.Selection.
     /// `content` is the raw bytes of the clipboard payload (D-Bus `ay`).
