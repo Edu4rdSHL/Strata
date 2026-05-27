@@ -21,6 +21,10 @@ export default class StrataExtension extends Extension {
     _daemonRestartAttempts = 0;
     _shuttingDown = false;
     _daemonRestartTimerId = null;
+    _daemonKillTimerId = null;
+    /** True while a GetNameOwner check before spawning is in flight, so an
+     *  overlapping respawn attempt can't spawn a second daemon. */
+    _spawnPending = false;
 
     /** @type {StrataPanel | null} */
     _panel = null;
@@ -266,6 +270,11 @@ export default class StrataExtension extends Extension {
 
     _spawnDaemon() {
         if (this._shuttingDown) return;
+        // Coalesce overlapping spawn attempts: the async GetNameOwner check below
+        // can still be in flight when the backoff timer fires _spawnDaemon again.
+        // Without this guard both could call _doSpawnDaemon and spawn two daemons.
+        if (this._spawnPending) return;
+        this._spawnPending = true;
 
         // Check if a daemon is already running (e.g. via systemd user service).
         // If the D-Bus name is already owned we must not spawn a second instance.
@@ -275,6 +284,8 @@ export default class StrataExtension extends Extension {
             new GLib.Variant('(s)', [BUS_NAME]),
             null, Gio.DBusCallFlags.NONE, 2000, null,
             (_conn, result) => {
+                this._spawnPending = false;
+                if (this._shuttingDown) return;
                 try {
                     _conn.call_finish(result);
                     // Name already owned - daemon managed externally (systemd etc).
@@ -305,7 +316,7 @@ export default class StrataExtension extends Extension {
             });
             this._daemon.init(null);
             this._daemonSpawnTime = GLib.get_monotonic_time() / 1000; // ms
-            this._daemon.wait_async(null, () => this._onDaemonExited());
+            this._daemon.wait_async(null, (proc) => this._onDaemonExited(proc));
         } catch (e) {
             console.error('[Strata] Failed to spawn daemon:', e);
             this._scheduleDaemonRestart();
@@ -331,9 +342,12 @@ export default class StrataExtension extends Extension {
         }
     }
 
-    _onDaemonExited() {
-        if (!this._daemon) return; // shutdown initiated by _stopDaemon
-        const exit = this._daemon.get_exit_status();
+    _onDaemonExited(proc) {
+        // Ignore exits from anything that is not the current daemon: a stop
+        // initiated by _stopDaemon (which nulls _daemon), or a stray subprocess
+        // from an overlapping spawn. Otherwise we'd misattribute its exit.
+        if (!this._daemon || proc !== this._daemon) return;
+        const exit = proc.get_exit_status();
         const lifetimeMs = (GLib.get_monotonic_time() / 1000) - this._daemonSpawnTime;
         this._daemon = null;
 

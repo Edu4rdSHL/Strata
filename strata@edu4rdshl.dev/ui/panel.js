@@ -347,6 +347,7 @@ export class StrataPanel {
         this._items = [];
         this._searchResults = [];
         this._searchRendered = 0;
+        this._resultsEpoch = -1; // invalidate the search snapshot so a scroll can't render stale rows
         this._hoveredWidget = null;
         this._activeWidget  = null;
         this._widgets.clear();
@@ -558,6 +559,7 @@ export class StrataPanel {
 
     _ensureVisible(widget) {
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            if (!this._overlay) return GLib.SOURCE_REMOVE; // panel destroyed before idle ran
             try {
                 const adj = this._scrollView.get_vadjustment();
                 if (!adj || adj.page_size === 0) return GLib.SOURCE_REMOVE;
