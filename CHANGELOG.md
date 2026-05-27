@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.7.0] - 2026-05-26
+
+### Fixed
+
+- Theme stylesheet reload no longer recurses. `load_stylesheet` itself emits
+  the St theme context's `changed` signal, so reloading `light.css` on every
+  `changed` fed back into itself and hit "too much recursion" - flooding the
+  journal and spinning the CPU on screen unlock (which restyles widgets and
+  fires `changed`). `light.css` is now loaded once and the `changed`
+  subscription is removed entirely. (Dark/light switching is unaffected - it is
+  the panel's class toggle, not this load. A GNOME Shell *theme* switch no
+  longer auto-re-applies the sheet; that is recoverable by re-enabling.)
+
+### Changed
+
+- **BREAKING (D-Bus): the service was renamed from `org.gnome.Strata` to
+  `dev.edu4rdshl.Strata`.** The `org.gnome.*` namespace is reserved for
+  official GNOME software; Strata is a third-party project, so it now uses the
+  reverse-DNS of its own domain (matching the `strata@edu4rdshl.dev` UUID).
+  Bus name, object path (`/dev/edu4rdshl/Strata`), and interface
+  (`dev.edu4rdshl.Strata.Manager`) all changed. The bundled daemon and
+  extension are updated together; only external `busctl` scripts or non-GNOME
+  front-ends that hard-coded the old name need updating. The GSettings schema
+  (`org.gnome.shell.extensions.strata`) is unchanged - that namespace is the
+  correct convention for GNOME Shell extension settings.
+
+---
+
 ## [0.6.0] - 2026-05-26
 
 ### Added
