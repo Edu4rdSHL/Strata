@@ -10,7 +10,7 @@ All heavy work (hashing, decoding, storage, search, thumbnails) lives in a Rust
 daemon. The GNOME Shell extension only renders UI and forwards events over
 D-Bus, so the compositor is never blocked, even with thousands of items.
 
-The motivation behind this is explained in the technical blog post [Retrhinking the GNOME clipboard issues](https://edu4rdshl.dev/posts/rethinking-the-gnome-clipboard-issues/)
+The motivation behind this is explained in the technical blog post [Rethinking the GNOME clipboard issues](https://edu4rdshl.dev/posts/rethinking-the-gnome-clipboard-issues/)
 
 ## Features
 
