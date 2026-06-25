@@ -13,6 +13,14 @@ import { ClipboardItem } from './clipboardItem.js';
 const SEARCH_DEBOUNCE_MS = 150;
 const LOAD_MORE_THRESHOLD = 200;
 
+function logError(label, err) {
+    if (err !== undefined) {
+        try { Gio.DBusError.strip_remote_error(err); } catch (_) {}
+    }
+    const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
+    console.error(`[Strata] ${label}${tail}`);
+}
+
 export class StrataPanel {
     constructor(proxy, settings, indicator = null) {
         this._proxy = proxy;
@@ -90,7 +98,7 @@ export class StrataPanel {
         if (!this._proxy.g_name_owner) return;
         this._initialLoaded = true;
         this._loadHistory(0, this._pageSize).catch(e =>
-            console.error('[Strata] initial _loadHistory failed:', e));
+            logError('initial _loadHistory failed', e));
     }
 
 
@@ -261,7 +269,7 @@ export class StrataPanel {
         // retry now that the user is asking to see the list.
         if (this._items.length === 0 && this._loadedOffset === 0 && this._hasMore) {
             this._loadHistory(0, this._pageSize).catch(e =>
-                console.error('[Strata] open: history reload failed:', e));
+                logError('open: history reload failed', e));
         }
         global.stage.set_key_focus(this._searchEntry.get_clutter_text());
     }
@@ -301,7 +309,7 @@ export class StrataPanel {
             this._itemList.insert_child_at_index(widget, 0);
             this._setActiveWidget(widget);
         } catch (e) {
-            console.error(`[Strata] prependItem failed for id=${id} mime=${mimeType}:`, e);
+            logError(`prependItem failed for id=${id} mime=${mimeType}`, e);
             this._items = this._items.filter(i => i.id !== id);
         }
     }
@@ -410,8 +418,7 @@ export class StrataPanel {
             }
             return items.length;
         } catch (e) {
-            Gio.DBusError.strip_remote_error(e);
-            console.error('[Strata] GetHistory failed:', e.message);
+            logError('GetHistory failed', e);
             return 0;
         }
     }
@@ -428,7 +435,7 @@ export class StrataPanel {
             this._widgets.set(id, widget);
             this._itemList.add_child(widget);
         } catch (e) {
-            console.error(`[Strata] _appendItemFromMeta failed for id=${meta?.id}:`, e);
+            logError(`_appendItemFromMeta failed for id=${meta?.id}`, e);
         }
     }
 
@@ -571,7 +578,7 @@ export class StrataPanel {
                 else if (box.y2 > cur + pageSize)
                     adj.value = box.y2 - pageSize;
             } catch (e) {
-                console.error('[Strata] ensureVisible error:', e);
+                logError('ensureVisible error', e);
             }
             return GLib.SOURCE_REMOVE;
         });
@@ -582,8 +589,7 @@ export class StrataPanel {
             const [mimeType, content] = await this._proxy.GetItemContentAsync(id);
             this._writeToClipboard(mimeType, content);
         } catch (e) {
-            Gio.DBusError.strip_remote_error(e);
-            console.error('[Strata] GetItemContent failed:', e.message);
+            logError('GetItemContent failed', e);
         }
         this.close();
     }
@@ -604,7 +610,7 @@ export class StrataPanel {
                 );
             }
         } catch (e) {
-            console.error('[Strata] Clipboard write error:', e);
+            logError('Clipboard write error', e);
         }
     }
 
@@ -612,8 +618,7 @@ export class StrataPanel {
         try {
             await this._proxy.ClearHistoryAsync();
         } catch (e) {
-            Gio.DBusError.strip_remote_error(e);
-            console.error('[Strata] ClearHistory failed:', e.message);
+            logError('ClearHistory failed', e);
         }
     }
 
@@ -628,7 +633,7 @@ export class StrataPanel {
             GLib.PRIORITY_DEFAULT, SEARCH_DEBOUNCE_MS, () => {
                 this._searchDebounceId = null;
                 this._runSearch(trimmed).catch(e =>
-                    console.error('[Strata] search failed:', e));
+                    logError('search failed', e));
                 return GLib.SOURCE_REMOVE;
             });
     }
@@ -662,7 +667,7 @@ export class StrataPanel {
                     this._clearListDom();
                     this._items = [];
                 }
-            }).catch(e => console.error('[Strata] reset-history failed:', e));
+            }).catch(e => logError('reset-history failed', e));
             return;
         }
 
@@ -674,8 +679,7 @@ export class StrataPanel {
         try {
             [json] = await this._proxy.SearchHistoryAsync(query, limit);
         } catch (e) {
-            Gio.DBusError.strip_remote_error(e);
-            console.error('[Strata] SearchHistory failed:', e.message);
+            logError('SearchHistory failed', e);
             return;
         }
         if (epoch !== this._searchEpoch || !this._overlay) return; // stale or destroyed
@@ -684,7 +688,7 @@ export class StrataPanel {
         try {
             results = JSON.parse(json);
         } catch (e) {
-            console.error('[Strata] SearchHistory: bad JSON:', e);
+            logError('SearchHistory: bad JSON', e);
             return;
         }
 

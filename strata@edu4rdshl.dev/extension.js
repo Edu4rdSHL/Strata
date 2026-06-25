@@ -14,6 +14,14 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { StrataProxy, BUS_NAME, OBJECT_PATH } from './dbus.js';
 import { StrataPanel } from './ui/panel.js';
 
+function logError(label, err) {
+    if (err !== undefined) {
+        try { Gio.DBusError.strip_remote_error(err); } catch (_) {}
+    }
+    const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
+    console.error(`[Strata] ${label}${tail}`);
+}
+
 export default class StrataExtension extends Extension {
     /** @type {Gio.Subprocess | null} */
     _daemon = null;
@@ -59,6 +67,9 @@ export default class StrataExtension extends Extension {
 
     /** @type {boolean} Re-entrancy guard for signal processing */
     _busy = false;
+
+    /** @type {Set<number>} Pending GLib.idle_add source IDs to flush on disable. */
+    _idleSources = new Set();
 
     /** @type {number | null} Keyboard shortcut binding ID */
     _shortcutId = null;
@@ -110,6 +121,7 @@ export default class StrataExtension extends Extension {
         this._disconnectClipboardMonitor();
         this._disconnectFocusTracking();
         this._disconnectSignals();
+        this._clearIdleSources();
         if (this._proxyOwnerId && this._proxy) {
             this._proxy.disconnect(this._proxyOwnerId);
             this._proxyOwnerId = 0;
@@ -124,6 +136,10 @@ export default class StrataExtension extends Extension {
         }
         this._panel?.destroy();
         this._panel = null;
+        if (this._indicatorClickId && this._indicator) {
+            this._indicator.disconnect(this._indicatorClickId);
+            this._indicatorClickId = null;
+        }
         this._indicator?.destroy();
         this._indicator = null;
         this._unloadThemeStylesheet();
@@ -141,7 +157,7 @@ export default class StrataExtension extends Extension {
             style_class: 'system-status-icon',
         });
         this._indicator.add_child(icon);
-        this._indicator.connect('button-press-event', () => {
+        this._indicatorClickId = this._indicator.connect('button-press-event', () => {
             this._panel?.toggle();
             return false; // EVENT_PROPAGATE
         });
@@ -221,7 +237,7 @@ export default class StrataExtension extends Extension {
                     // synchronous base64 work on the GJS main thread.
                     this._proxy?.SubmitItemRemote(mime, bytes.get_data(), () => {});
                 } catch (e) {
-                    console.error('[Strata] Clipboard read error:', e.message);
+                    logError('Clipboard read error', e);
                 }
             }
         );
@@ -287,10 +303,7 @@ export default class StrataExtension extends Extension {
         if (this._shuttingDown) return;
         const daemonPath = GLib.find_program_in_path('strata-daemon');
         if (!daemonPath) {
-            console.error(
-                '[Strata] strata-daemon not found in PATH. ' +
-                'Install the strata-daemon package or place the binary in your PATH.'
-            );
+            logError('strata-daemon not found in PATH. Install the strata-daemon package or place the binary in your PATH.');
             this._notifyDaemonMissing();
             return;
         }
@@ -303,7 +316,7 @@ export default class StrataExtension extends Extension {
             this._daemonSpawnTime = GLib.get_monotonic_time() / 1000; // ms
             this._daemon.wait_async(null, (proc) => this._onDaemonExited(proc));
         } catch (e) {
-            console.error('[Strata] Failed to spawn daemon:', e);
+            logError('Failed to spawn daemon', e);
             this._scheduleDaemonRestart();
         }
     }
@@ -343,16 +356,10 @@ export default class StrataExtension extends Extension {
             this._daemonRestartAttempts = 0;
         }
         this._daemonRestartAttempts++;
-        console.error(
-            `[Strata] daemon exited with status ${exit} after ${Math.round(lifetimeMs)}ms ` +
-            `(restart attempt ${this._daemonRestartAttempts})`
-        );
+        logError(`daemon exited with status ${exit} after ${Math.round(lifetimeMs)}ms (restart attempt ${this._daemonRestartAttempts})`);
 
         if (this._daemonRestartAttempts > 5) {
-            console.error(
-                '[Strata] Daemon crashed 5 times in rapid succession - giving up. ' +
-                'Disable and re-enable the extension to retry.'
-            );
+            logError('Daemon crashed 5 times in rapid succession - giving up. Disable and re-enable the extension to retry.');
             return;
         }
         this._scheduleDaemonRestart();
@@ -396,8 +403,7 @@ export default class StrataExtension extends Extension {
                 OBJECT_PATH,
                 (proxy, error) => {
                     if (error) {
-                        Gio.DBusError.strip_remote_error(error);
-                        console.error('[Strata] D-Bus proxy error:', error.message);
+                        logError('D-Bus proxy error', error);
                         return;
                     }
                     this._connectSignals();
@@ -411,7 +417,7 @@ export default class StrataExtension extends Extension {
                 }
             );
         } catch (e) {
-            console.error('[Strata] Failed to create D-Bus proxy:', e);
+            logError('Failed to create D-Bus proxy', e);
         }
     }
 
@@ -445,10 +451,7 @@ export default class StrataExtension extends Extension {
                         `${GLib.get_user_cache_dir()}/strata/thumbnails/${id}.png`;
                     GLib.unlink(cachePath);
                 } catch (_) {}
-                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                    this._panel?.removeItem(id);
-                    return GLib.SOURCE_REMOVE;
-                });
+                this._addIdleSource(() => this._panel?.removeItem(id));
             });
 
         this._historyClearedId = this._proxy.connectSignal('HistoryCleared',
@@ -465,11 +468,8 @@ export default class StrataExtension extends Extension {
                         }
                         en.close(null);
                     }
-                } catch (e) { console.error('[Strata] cache clear failed:', e.message); }
-                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                    this._panel?.clearItems();
-                    return GLib.SOURCE_REMOVE;
-                });
+                } catch (e) { logError('cache clear failed', e); }
+                this._addIdleSource(() => this._panel?.clearItems());
             });
     }
 
@@ -493,6 +493,23 @@ export default class StrataExtension extends Extension {
     }
 
 
+    /** Schedule a one-shot idle callback whose source ID is tracked so disable()
+     *  can drop pending work instead of leaking a closure on `this`. */
+    _addIdleSource(callback) {
+        const id = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._idleSources.delete(id);
+            callback();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._idleSources.add(id);
+        return id;
+    }
+
+    _clearIdleSources() {
+        for (const id of this._idleSources) GLib.Source.remove(id);
+        this._idleSources.clear();
+    }
+
     _onItemAdded(id, mimeType, preview) {
         // Debounce: if the daemon emits a burst, coalesce into one update.
         if (this._pendingSignalId !== null) {
@@ -502,7 +519,7 @@ export default class StrataExtension extends Extension {
         this._pendingSignalId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
             this._pendingSignalId = null;
             this._processItemAdded(id, mimeType, preview)
-                .catch(e => console.error('[Strata] ItemAdded error:', e.message));
+                .catch(e => logError('ItemAdded error', e));
             return GLib.SOURCE_REMOVE;
         });
     }
@@ -517,10 +534,7 @@ export default class StrataExtension extends Extension {
                 } catch (_) { /* item may already be gone */ }
                 return;
             }
-            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                this._panel?.prependItem(id, mimeType, preview);
-                return GLib.SOURCE_REMOVE;
-            });
+            this._addIdleSource(() => this._panel?.prependItem(id, mimeType, preview));
         } finally {
             this._busy = false;
         }
@@ -576,7 +590,7 @@ export default class StrataExtension extends Extension {
             this._stTheme = themeContext.get_theme();
             this._stTheme.load_stylesheet(this._lightCssFile);
         } catch (e) {
-            console.error('[Strata] Failed to load light.css:', e);
+            logError('Failed to load light.css', e);
         }
     }
 
@@ -584,7 +598,7 @@ export default class StrataExtension extends Extension {
         try {
             this._stTheme?.unload_stylesheet(this._lightCssFile);
         } catch (e) {
-            console.error('[Strata] Failed to unload light.css:', e);
+            logError('Failed to unload light.css', e);
         }
         this._stTheme = null;
         this._lightCssFile = null;
