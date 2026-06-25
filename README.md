@@ -4,6 +4,8 @@
 
 # Strata
 
+<img width="1470" height="1227" alt="image" src="https://github.com/user-attachments/assets/07a17d08-4d7f-4afb-bafc-9346814e376a" />
+
 A fast, stutter-free clipboard manager for GNOME Shell.
 
 All heavy work (hashing, decoding, storage, search, thumbnails) lives in a Rust
