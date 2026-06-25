@@ -97,8 +97,9 @@ export class StrataPanel {
         if (this._initialLoaded) return;
         if (!this._proxy.g_name_owner) return;
         this._initialLoaded = true;
-        this._loadHistory(0, this._pageSize).catch(e =>
-            logError('initial _loadHistory failed', e));
+        this._loadHistory(0, this._pageSize).then(ok => {
+            if (!ok) this._initialLoaded = false;
+        });
     }
 
 
@@ -393,14 +394,14 @@ export class StrataPanel {
 
 
     async _loadHistory(offset, limit) {
-        if (!this._overlay) return 0;
+        if (!this._overlay) return false;
         try {
             const [json] = await this._proxy.GetHistoryAsync(offset, limit);
-            if (!this._overlay) return 0;
+            if (!this._overlay) return false;
             const items = JSON.parse(json);
             const BATCH = 20;
             for (let i = 0; i < items.length; i += BATCH) {
-                if (!this._overlay) return items.length;
+                if (!this._overlay) return false;
                 await new Promise(resolve =>
                     GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                         const end = Math.min(i + BATCH, items.length);
@@ -416,10 +417,10 @@ export class StrataPanel {
                 const firstWidget = this._widgets.get(items[0].id);
                 if (firstWidget) this._setActiveWidget(firstWidget);
             }
-            return items.length;
+            return true;
         } catch (e) {
             logError('GetHistory failed', e);
-            return 0;
+            return false;
         }
     }
 
