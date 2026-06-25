@@ -4,8 +4,6 @@
 
 # Strata
 
-<img width="1470" height="1227" alt="image" src="https://github.com/user-attachments/assets/07a17d08-4d7f-4afb-bafc-9346814e376a" />
-
 A fast, stutter-free clipboard manager for GNOME Shell.
 
 All heavy work (hashing, decoding, storage, search, thumbnails) lives in a Rust
@@ -79,6 +77,12 @@ Unknown MIME types are ignored (a strict allowlist).
   `Super+Shift+V`).
 - Keyboard navigation (arrow keys, `Esc` to close), click-outside to dismiss,
   per-row delete, and "Clear all".
+
+## How it looks
+
+The idea is to have a simple but responsive UI that fits into the project's goals. Actually, Strata looks like it:
+
+<img width="1470" height="1227" alt="image" src="https://github.com/user-attachments/assets/07a17d08-4d7f-4afb-bafc-9346814e376a" />
 
 ## Architecture
 
