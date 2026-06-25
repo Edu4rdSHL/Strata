@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.9.0] - 2026-06-25
+
+The daemon is unchanged from 0.8.0; all changes are in the GNOME Shell extension.
+
+### Changed
+
+- App exclusion is enforced before a copy is sent to the daemon, instead of
+  storing the item and deleting it afterward. Excluded content no longer
+  reaches the database, and the focused app is checked at copy time.
+- The D-Bus client follows the GJS guide: signals are handled through the proxy
+  (`connectSignal`) and D-Bus errors are stripped of their `GDBus.Error` prefix
+  before logging.
+- `shell-version` declares GNOME Shell 50 only, the version the extension is
+  tested on. Installs on older releases are no longer offered.
+- The daemon-missing notification points to the project page for install
+  instructions.
+
+### Fixed
+
+- The initial history load retries on the next daemon connection if the first
+  fetch fails, instead of leaving the panel empty until it is reopened.
+- The D-Bus proxy callback is ignored when the extension was disabled (or
+  re-enabled) while the proxy was still being created.
+- `disable()` disconnects the panel indicator signal and drops pending idle
+  callbacks, so nothing runs against a torn-down extension.
+
+### Internal
+
+- Extension logging goes through one helper per file. Removed dead fields,
+  stale comments, and leftover narration flagged by the EGO review guidelines
+  and the shexli static analyzer.
+
+---
+
 ## [0.8.0] - 2026-05-26
 
 ### Changed

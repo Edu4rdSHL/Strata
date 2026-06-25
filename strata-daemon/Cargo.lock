@@ -1205,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "strata-daemon"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "blake3",
