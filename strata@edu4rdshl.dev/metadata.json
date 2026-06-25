@@ -3,7 +3,7 @@
   "description": "A fast clipboard manager. Storage, search and image decoding run in a separate Rust daemon.",
   "uuid": "strata@edu4rdshl.dev",
   "version": 8,
-  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.strata",
   "url": "https://github.com/Edu4rdSHL/Strata"
 }

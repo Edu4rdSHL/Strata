@@ -106,7 +106,7 @@ GNOME Shell (GJS)  ──D-Bus──▶  strata-daemon  ──▶  SQLite (~/.lo
 
 ## Requirements
 
-- GNOME Shell 50 (tested). May work on 45-49 but is untested; if it works for you, please open an issue to let us know.
+- GNOME Shell 50. Older releases may work if built from source but are not tested or supported.
 - `strata-daemon` binary in `$PATH` (see Install below)
 - Rust 1.74+ (build only)
 - `glib-compile-schemas` (from `glib2-devel` / `libglib2.0-dev-bin`)
