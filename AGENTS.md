@@ -101,10 +101,61 @@ CSS files must be added to the `pack` target as `--extra-source` (only
 
 - No `--` em-dashes, no emojis in code comments or docs.
 - Rust: use `tracing::info!`, `tracing::warn!`, `tracing::error!` (qualified path, not bare imports). No `println!` in daemon code.
-- GJS: `console.log('[Strata] ...')` / `console.error('[Strata] ...')` prefix for all extension logs.
+- GJS: route all errors through the `logError(label, err)` helper at the top
+  of `extension.js` and `ui/panel.js`. It prepends `[Strata]` and strips the
+  `GDBus.Error:` prefix from D-Bus errors. Do not call `console.error`
+  directly. Do not use `console.log` for normal flow events; only errors
+  should appear in the journal.
 - Size limits travel as bytes over D-Bus. MB conversion happens extension-side.
 - `Ordering::Relaxed` is intentional on `Arc<AtomicUsize>` limits (advisory, not critical path).
 - Never execute clipboard content. Writes go through `wl-clipboard-rs` (`copy_multi`) in the daemon, never via shell subprocess or `eval`.
 - Excluded apps list is checked before storing any clipboard item.
 - Ingest paths are mutually exclusive by environment: on GNOME the monitor cannot bind (Mutter exposes neither data-control protocol) so ingest is GJS `SubmitItem`; on wlroots the built-in monitor is the path.
 - List queries (`get_history_page`, `search_history`) return `content_text` truncated to `PREVIEW_CHARS` via `substr`; full content is served only by `GetItemContent` for paste-back.
+
+## D-Bus client conventions
+
+- Use the `makeProxyWrapper` proxy from `dbus.js`. Do not construct
+  `Gio.DBusProxy` directly elsewhere.
+- Method calls: `*Async` for await-style, `*Remote` for fire-and-forget.
+  Never call a synchronous variant.
+- Signal subscriptions: `this._proxy.connectSignal('Name', handler)` paired
+  with `disconnectSignal(id)` in `_disconnectSignals`. Do not use the
+  low-level `Gio.DBus.session.signal_subscribe`.
+- Monitor `notify::g-name-owner` on the proxy to react to daemon
+  availability (initial load, config re-push after respawn).
+
+## Extension lifecycle (disable cleanup)
+
+Every resource opened while enabled must be released in `disable()` or in a
+helper called from `disable()`. The EGO static analyzer (shexli) flags
+implicit cleanup as a warning, so be explicit:
+
+- Every `obj.connect('signal', ...)` must store its ID; `disable()` must
+  call `obj.disconnect(id)`, even on actors that get `destroy()`ed.
+- Every `GLib.timeout_add(...)` must store its source ID so it can be
+  removed in `disable()` (or in the fire callback for one-shot sources).
+- Every `GLib.idle_add(...)` must go through `this._addIdleSource(callback)`,
+  which tracks the source ID in `_idleSources`. `_clearIdleSources()` flushes
+  pending sources in `disable()`.
+- Every `proxy.connectSignal(...)` must be paired with `disconnectSignal`.
+
+## EGO submission
+
+Before submitting to extensions.gnome.org, pack and run the `shexli` static
+analyzer:
+
+```sh
+make pack
+pip install -U shexli
+shexli strata@edu4rdshl.dev.shell-extension.zip
+```
+
+Address any `warning` or `error` findings. A `manual_review` finding is
+expected for direct `St.Clipboard` access (Strata is a clipboard manager);
+declare it in the long description on the EGO upload form so the reviewer
+doesn't have to guess.
+
+`shell-version` in `metadata.json` must list only Shell versions the
+extension has actually been tested on. Aspirational entries are a known
+rejection cause.
