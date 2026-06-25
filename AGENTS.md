@@ -13,6 +13,13 @@ contrib/systemd/        systemd user service unit for distro packaging
 ARCHITECTURE.md         In-depth design document
 ```
 
+## Upstream guidelines
+
+- EGO review: https://gjs.guide/extensions/review-guidelines/review-guidelines.html
+- GJS D-Bus: https://gjs.guide/guides/gio/dbus.html
+
+The conventions in this file follow both.
+
 ## Core principle
 
 "JS draws, Rust thinks." The extension must never block the GNOME Shell
