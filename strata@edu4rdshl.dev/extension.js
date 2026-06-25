@@ -396,7 +396,8 @@ export default class StrataExtension extends Extension {
                 OBJECT_PATH,
                 (proxy, error) => {
                     if (error) {
-                        console.error('[Strata] D-Bus proxy error:', error);
+                        Gio.DBusError.strip_remote_error(error);
+                        console.error('[Strata] D-Bus proxy error:', error.message);
                         return;
                     }
                     this._connectSignals();
@@ -433,48 +434,25 @@ export default class StrataExtension extends Extension {
     }
 
     _connectSignals() {
-        this._itemAddedId = Gio.DBus.session.signal_subscribe(
-            BUS_NAME,
-            'dev.edu4rdshl.Strata.Manager',
-            'ItemAdded',
-            OBJECT_PATH,
-            null,
-            Gio.DBusSignalFlags.NONE,
-            this._onItemAdded.bind(this)
-        );
+        this._itemAddedId = this._proxy.connectSignal('ItemAdded',
+            (_p, _sender, [id, mimeType, preview]) =>
+                this._onItemAdded(id, mimeType, preview));
 
-        this._itemDeletedId = Gio.DBus.session.signal_subscribe(
-            BUS_NAME,
-            'dev.edu4rdshl.Strata.Manager',
-            'ItemDeleted',
-            OBJECT_PATH,
-            null,
-            Gio.DBusSignalFlags.NONE,
-            (_conn, _sender, _path, _iface, _signal, params) => {
-                const [id] = params.deepUnpack();
-                // Best-effort: unlink the on-disk thumbnail file (if any).
-                // GLib.unlink returns -1 if file doesn't exist; we ignore that.
+        this._itemDeletedId = this._proxy.connectSignal('ItemDeleted',
+            (_p, _sender, [id]) => {
                 try {
                     const cachePath =
                         `${GLib.get_user_cache_dir()}/strata/thumbnails/${id}.png`;
                     GLib.unlink(cachePath);
-                } catch (_) { /* not all items have thumbnails - fine */ }
+                } catch (_) {}
                 GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     this._panel?.removeItem(id);
                     return GLib.SOURCE_REMOVE;
                 });
-            }
-        );
+            });
 
-        this._historyClearedId = Gio.DBus.session.signal_subscribe(
-            BUS_NAME,
-            'dev.edu4rdshl.Strata.Manager',
-            'HistoryCleared',
-            OBJECT_PATH,
-            null,
-            Gio.DBusSignalFlags.NONE,
+        this._historyClearedId = this._proxy.connectSignal('HistoryCleared',
             () => {
-                // Wipe all on-disk thumbnails when daemon clears history.
                 try {
                     const dir = `${GLib.get_user_cache_dir()}/strata/thumbnails`;
                     const d = Gio.File.new_for_path(dir);
@@ -487,26 +465,25 @@ export default class StrataExtension extends Extension {
                         }
                         en.close(null);
                     }
-                } catch (e) { console.error('[Strata] cache clear failed:', e); }
+                } catch (e) { console.error('[Strata] cache clear failed:', e.message); }
                 GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     this._panel?.clearItems();
                     return GLib.SOURCE_REMOVE;
                 });
-            }
-        );
+            });
     }
 
     _disconnectSignals() {
-        if (this._itemAddedId !== null) {
-            Gio.DBus.session.signal_unsubscribe(this._itemAddedId);
+        if (this._itemAddedId && this._proxy) {
+            this._proxy.disconnectSignal(this._itemAddedId);
             this._itemAddedId = null;
         }
-        if (this._itemDeletedId !== null) {
-            Gio.DBus.session.signal_unsubscribe(this._itemDeletedId);
+        if (this._itemDeletedId && this._proxy) {
+            this._proxy.disconnectSignal(this._itemDeletedId);
             this._itemDeletedId = null;
         }
-        if (this._historyClearedId !== null) {
-            Gio.DBus.session.signal_unsubscribe(this._historyClearedId);
+        if (this._historyClearedId && this._proxy) {
+            this._proxy.disconnectSignal(this._historyClearedId);
             this._historyClearedId = null;
         }
         if (this._pendingSignalId !== null) {
@@ -516,7 +493,7 @@ export default class StrataExtension extends Extension {
     }
 
 
-    _onItemAdded(_conn, _sender, _path, _iface, _signal, params) {
+    _onItemAdded(id, mimeType, preview) {
         // Debounce: if the daemon emits a burst, coalesce into one update.
         if (this._pendingSignalId !== null) {
             GLib.Source.remove(this._pendingSignalId);
@@ -524,28 +501,22 @@ export default class StrataExtension extends Extension {
         }
         this._pendingSignalId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
             this._pendingSignalId = null;
-            this._processItemAdded(params).catch(e => console.error('[Strata] ItemAdded error:', e));
+            this._processItemAdded(id, mimeType, preview)
+                .catch(e => console.error('[Strata] ItemAdded error:', e.message));
             return GLib.SOURCE_REMOVE;
         });
     }
 
-    async _processItemAdded(params) {
+    async _processItemAdded(id, mimeType, preview) {
         if (this._busy) return;
         this._busy = true;
         try {
-            const [id, mimeType, preview] = params.deepUnpack();
-
-            // Exclusion check - no clipboard I/O, just string comparison.
             if (this._isExcluded(this._currentFocusedApp)) {
                 try {
                     await this._proxy?.DeleteItemAsync(id);
-                } catch (e) {
-                    // ignore - item may already be gone
-                }
+                } catch (_) { /* item may already be gone */ }
                 return;
             }
-
-            // Defer UI mutation to after the current frame renders.
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 this._panel?.prependItem(id, mimeType, preview);
                 return GLib.SOURCE_REMOVE;

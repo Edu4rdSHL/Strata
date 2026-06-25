@@ -410,7 +410,8 @@ export class StrataPanel {
             }
             return items.length;
         } catch (e) {
-            console.error('[Strata] _loadHistory failed:', e);
+            Gio.DBusError.strip_remote_error(e);
+            console.error('[Strata] GetHistory failed:', e.message);
             return 0;
         }
     }
@@ -581,7 +582,8 @@ export class StrataPanel {
             const [mimeType, content] = await this._proxy.GetItemContentAsync(id);
             this._writeToClipboard(mimeType, content);
         } catch (e) {
-            console.error('[Strata] Paste error:', e);
+            Gio.DBusError.strip_remote_error(e);
+            console.error('[Strata] GetItemContent failed:', e.message);
         }
         this.close();
     }
@@ -610,7 +612,8 @@ export class StrataPanel {
         try {
             await this._proxy.ClearHistoryAsync();
         } catch (e) {
-            console.error('[Strata] ClearHistory error:', e);
+            Gio.DBusError.strip_remote_error(e);
+            console.error('[Strata] ClearHistory failed:', e.message);
         }
     }
 
@@ -671,7 +674,8 @@ export class StrataPanel {
         try {
             [json] = await this._proxy.SearchHistoryAsync(query, limit);
         } catch (e) {
-            console.error('[Strata] SearchHistory D-Bus error:', e);
+            Gio.DBusError.strip_remote_error(e);
+            console.error('[Strata] SearchHistory failed:', e.message);
             return;
         }
         if (epoch !== this._searchEpoch || !this._overlay) return; // stale or destroyed
