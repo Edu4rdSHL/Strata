@@ -400,6 +400,7 @@ export default class StrataExtension extends Extension {
                 BUS_NAME,
                 OBJECT_PATH,
                 (proxy, error) => {
+                    if (this._shuttingDown || proxy !== this._proxy) return;
                     if (error) {
                         logError('D-Bus proxy error', error);
                         return;
