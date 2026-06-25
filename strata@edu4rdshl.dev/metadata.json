@@ -1,6 +1,6 @@
 {
   "name": "Strata",
-  "description": "A fast, stutter-free clipboard manager. All I/O runs in a Rust daemon - GNOME Shell is never blocked.",
+  "description": "A fast clipboard manager. Storage, search and image decoding run in a separate Rust daemon.",
   "uuid": "strata@edu4rdshl.dev",
   "version": 8,
   "shell-version": ["45", "46", "47", "48", "49", "50"],

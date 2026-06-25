@@ -48,13 +48,8 @@ export const ClipboardItem = GObject.registerClass({
 
         this._id = id;
         this._mimeType = mimeType;
-        /** D-Bus proxy used for lazy thumbnail fetch. */
         this._proxy = opts.proxy ?? null;
-        /** Optional shared LRU cache (Map<id, string filePath>) - populated on first fetch. */
         this._thumbCache = opts.thumbCache ?? null;
-        /** Stored on the actor so panel.js can filter by it. */
-        this.actor = this;
-        this._strataPreview = mimeType.startsWith('image/') ? '' : preview;
 
         const row = new St.BoxLayout({
             style_class: 'strata-item-row',
@@ -112,10 +107,6 @@ export const ClipboardItem = GObject.registerClass({
         return icon;
     }
 
-    /** Build an image thumbnail container.
-     *  - If already in shared cache, apply immediately.
-     *  - Else fetch via GetThumbnailRemote, write to ~/.cache/strata/thumbnails/{id}.png,
-     *    then apply. The decode happens off-thread (CSS background-image loader). */
     _buildThumbnail(id) {
         const container = new St.Widget({
             width: THUMB_SIZE,
@@ -135,18 +126,15 @@ export const ClipboardItem = GObject.registerClass({
         };
 
         try {
-            // Fast path: already cached this session.
             if (this._thumbCache?.has(id)) {
                 applyStyle();
                 return container;
             }
-            // Second fast path: file exists on disk from a previous session.
             if (GLib.file_test(cachePath, GLib.FileTest.EXISTS)) {
                 this._thumbCache?.set(id, cachePath);
                 applyStyle();
                 return container;
             }
-            // Slow path: ask the daemon for the bytes, then write file async.
             GLib.mkdir_with_parents(cacheDir, 0o755);
             if (!this._proxy) {
                 this._fallbackIcon(container);

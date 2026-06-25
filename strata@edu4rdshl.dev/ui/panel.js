@@ -298,7 +298,7 @@ export class StrataPanel {
 
             const widget = this._makeItemWidget(id, mimeType, preview);
             this._widgets.set(id, widget);
-            this._itemList.insert_child_at_index(widget.actor, 0);
+            this._itemList.insert_child_at_index(widget, 0);
             this._setActiveWidget(widget);
         } catch (e) {
             console.error(`[Strata] prependItem failed for id=${id} mime=${mimeType}:`, e);
@@ -425,7 +425,7 @@ export class StrataPanel {
             this._items.push({ id, mimeType, preview });
             const widget = this._makeItemWidget(id, mimeType, preview);
             this._widgets.set(id, widget);
-            this._itemList.add_child(widget.actor);
+            this._itemList.add_child(widget);
         } catch (e) {
             console.error(`[Strata] _appendItemFromMeta failed for id=${meta?.id}:`, e);
         }
@@ -475,12 +475,8 @@ export class StrataPanel {
                     for (let j = i; j < e; j++)
                         this._appendItemFromMeta(this._searchResults[j]);
                 };
-                // The very first chunk of a fresh render (start === 0, right after
-                // _clearListDom) is rendered synchronously, in the same frame as
-                // the clear, so the list never paints empty in between - that
-                // empty frame is the "blink" seen while typing a search. Later
-                // chunks (and scroll-driven pages) yield to idle to keep frames
-                // light.
+                // First chunk runs synchronously so the list never paints empty
+                // between clear and first append. Later chunks yield to idle.
                 if (i === 0) {
                     renderChunk();
                 } else {

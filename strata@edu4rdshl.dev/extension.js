@@ -58,7 +58,7 @@ export default class StrataExtension extends Extension {
     _pendingSignalId = null;
 
     /** @type {boolean} Re-entrancy guard for signal processing */
-    #busy = false;
+    _busy = false;
 
     /** @type {number | null} Keyboard shortcut binding ID */
     _shortcutId = null;
@@ -90,22 +90,11 @@ export default class StrataExtension extends Extension {
         // inert until the panel toggles the `.strata-theme-light` class (panel.js).
         this._loadThemeStylesheet();
 
-        // 1. Top-bar indicator icon.
         this._addIndicator();
-
-        // 2. Spawn the Rust daemon.
         this._spawnDaemon();
-
-        // 3. Connect D-Bus proxy (async - doesn't block if daemon isn't ready yet).
         this._connectProxy();
-
-        // 4. Track focused window (lightweight - no clipboard I/O).
         this._connectFocusTracking();
-
-        // 5. Monitor clipboard via Meta.Selection (GNOME-native, no Wayland protocol needed).
         this._connectClipboardMonitor();
-
-        // 6. Register keyboard shortcut.
         this._registerShortcut();
     }
 
@@ -261,9 +250,7 @@ export default class StrataExtension extends Extension {
         ];
         for (const want of PREFERRED)
             if (mimes.includes(want)) return want;
-        // Allowlist only: see comment in pick_mime (daemon). Reading unknown
-        // mime types could pull a 1 GB blob into Shell memory before we can
-        // size-check it.
+        // Allowlist only: see pick_mime in the daemon. Unknown mime types are skipped.
         return null;
     }
 
@@ -288,10 +275,8 @@ export default class StrataExtension extends Extension {
                 if (this._shuttingDown) return;
                 try {
                     _conn.call_finish(result);
-                    // Name already owned - daemon managed externally (systemd etc).
-                    console.log('[Strata] daemon already running, skipping spawn');
+                    // Name already owned (e.g. systemd user service) - don't spawn a second instance.
                 } catch (_) {
-                    // Name not owned - spawn it ourselves.
                     this._doSpawnDaemon();
                 }
             }
@@ -351,10 +336,7 @@ export default class StrataExtension extends Extension {
         const lifetimeMs = (GLib.get_monotonic_time() / 1000) - this._daemonSpawnTime;
         this._daemon = null;
 
-        if (this._shuttingDown) {
-            console.log(`[Strata] daemon exited cleanly during shutdown (status=${exit})`);
-            return;
-        }
+        if (this._shuttingDown) return;
 
         // Reset attempt counter if the daemon ran long enough to be considered healthy.
         if (lifetimeMs >= 5000) {
@@ -380,7 +362,6 @@ export default class StrataExtension extends Extension {
         if (this._shuttingDown) return;
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s
         const backoffMs = 1000 * Math.pow(2, Math.max(0, this._daemonRestartAttempts - 1));
-        console.log(`[Strata] respawning daemon in ${backoffMs}ms`);
         this._daemonRestartTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, backoffMs, () => {
             this._daemonRestartTimerId = null;
             this._spawnDaemon();
@@ -549,8 +530,8 @@ export default class StrataExtension extends Extension {
     }
 
     async _processItemAdded(params) {
-        if (this.#busy) return;
-        this.#busy = true;
+        if (this._busy) return;
+        this._busy = true;
         try {
             const [id, mimeType, preview] = params.deepUnpack();
 
@@ -570,7 +551,7 @@ export default class StrataExtension extends Extension {
                 return GLib.SOURCE_REMOVE;
             });
         } finally {
-            this.#busy = false;
+            this._busy = false;
         }
     }
 
@@ -614,17 +595,9 @@ export default class StrataExtension extends Extension {
     }
 
 
-    /** Load light.css into the global St theme context ONCE. It is scoped under
-     *  `.strata-theme-light`, so it stays inert until the panel adds that class
-     *  (dark/light switching is the panel's class toggle, independent of this).
-     *
-     *  We deliberately do NOT subscribe to the theme context's 'changed'
-     *  signal: load_stylesheet itself emits 'changed', so reloading on it feeds
-     *  back into itself and hits "too much recursion" (it fired on screen
-     *  unlock, which restyles widgets). The only thing a one-time load gives up
-     *  is re-applying after a GNOME Shell *theme* switch (which replaces the
-     *  St.Theme and drops this sheet) - a rare action, recoverable by toggling
-     *  the extension. That trade is worth never touching the signal. */
+    /** Load light.css once. It is scoped under `.strata-theme-light` and stays
+     *  inert until the panel adds that class. We do not subscribe to the theme
+     *  context's 'changed' signal because load_stylesheet itself emits it. */
     _loadThemeStylesheet() {
         try {
             const themeContext = St.ThemeContext.get_for_stage(global.stage);

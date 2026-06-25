@@ -1,10 +1,4 @@
-/**
- * prefs.js - Strata preferences window (GNOME 45+ / Adw).
- *
- * Pages:
- *  General:  max-history SpinRow, keyboard-shortcut ShortcutRow
- *  Privacy:  excluded-apps ExpanderRow + StringList (one entry per line)
- */
+/* prefs.js - Strata preferences window. */
 
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
@@ -22,17 +16,12 @@ export default class StrataPreferences extends ExtensionPreferences {
         window.add(this._buildPrivacyPage(settings));
     }
 
-    // -------------------------------------------------------------------------
-    // General page
-    // -------------------------------------------------------------------------
-
     _buildGeneralPage(settings) {
         const page = new Adw.PreferencesPage({
             title: 'General',
             icon_name: 'preferences-system-symbolic',
         });
 
-        // ── History ──────────────────────────────────────────────────────────
         const historyGroup = new Adw.PreferencesGroup({ title: 'History' });
 
         const maxHistoryRow = new Adw.SpinRow({
@@ -89,7 +78,6 @@ export default class StrataPreferences extends ExtensionPreferences {
 
         page.add(historyGroup);
 
-        // ── Appearance ───────────────────────────────────────────────────────
         const appearanceGroup = new Adw.PreferencesGroup({ title: 'Appearance' });
 
         const themes = [
@@ -180,7 +168,6 @@ export default class StrataPreferences extends ExtensionPreferences {
 
         page.add(appearanceGroup);
 
-        // ── Keyboard ─────────────────────────────────────────────────────────
         const kbGroup = new Adw.PreferencesGroup({ title: 'Keyboard' });
 
         const shortcutRow = new Adw.ActionRow({
@@ -208,10 +195,6 @@ export default class StrataPreferences extends ExtensionPreferences {
         return page;
     }
 
-    // -------------------------------------------------------------------------
-    // Privacy page
-    // -------------------------------------------------------------------------
-
     _buildPrivacyPage(settings) {
         const page = new Adw.PreferencesPage({
             title: 'Privacy',
@@ -223,7 +206,6 @@ export default class StrataPreferences extends ExtensionPreferences {
             description: 'Items copied while these apps have focus will not be stored in history. Enter a partial app name (case-insensitive).',
         });
 
-        // We use a StringList model bound to excluded-apps.
         const model = new Gtk.StringList();
         const currentApps = settings.get_strv('excluded-apps');
         for (const app of currentApps)
@@ -239,7 +221,6 @@ export default class StrataPreferences extends ExtensionPreferences {
             settings.set_strv('excluded-apps', apps);
         };
 
-        // Each item in the list: an EditableLabel + Remove button.
         const listBox = new Gtk.ListBox({
             selection_mode: Gtk.SelectionMode.NONE,
             css_classes: ['boxed-list'],
@@ -280,7 +261,6 @@ export default class StrataPreferences extends ExtensionPreferences {
                 listBox.append(row);
             }
 
-            // Add-new row.
             const addRow = new Adw.ActionRow({ activatable: false });
             const addEntry = new Gtk.Entry({
                 placeholder_text: 'App name…',
@@ -313,10 +293,6 @@ export default class StrataPreferences extends ExtensionPreferences {
         page.add(group);
         return page;
     }
-
-    // -------------------------------------------------------------------------
-    // Keyboard shortcut dialog
-    // -------------------------------------------------------------------------
 
     _showShortcutDialog(parent, settings) {
         const dialog = new Adw.MessageDialog({
