@@ -68,9 +68,6 @@ export default class StrataExtension extends Extension {
     /** @type {Set<number>} Pending GLib.idle_add source IDs to flush on disable. */
     _idleSources = new Set();
 
-    /** @type {number | null} Keyboard shortcut binding ID */
-    _shortcutId = null;
-
     enable() {
         this._shuttingDown = false;
         this._daemonRestartAttempts = 0;
@@ -198,8 +195,6 @@ export default class StrataExtension extends Extension {
         });
     }
 
-    /** Single in-flight transfer at a time - prevents queuing multiple concurrent
-     *  transfer_async + base64_encode operations that would stall the main thread. */
     _readClipboard() {
         if (this._clipboardTransferPending) return;
         const selection = global.display.get_selection();
@@ -228,11 +223,7 @@ export default class StrataExtension extends Extension {
                     const bytes = outputStream.steal_as_bytes();
                     const size = bytes.get_size();
                     if (size === 0) return;
-                    const MAX_TEXT  = this._maxTextBytes;
-                    const MAX_IMAGE = this._maxImageBytes;
-                    if (size > (mime.startsWith('image/') ? MAX_IMAGE : MAX_TEXT)) return;
-                    // Send raw bytes as a D-Bus `ay` so we avoid blocking
-                    // synchronous base64 work on the GJS main thread.
+                    if (size > (mime.startsWith('image/') ? this._maxImageBytes : this._maxTextBytes)) return;
                     this._proxy?.SubmitItemRemote(mime, bytes.get_data(), () => {});
                 } catch (e) {
                     logError('Clipboard read error', e);
@@ -406,7 +397,7 @@ export default class StrataExtension extends Extension {
                         return;
                     }
                     this._connectSignals();
-                    this._panel = new StrataPanel(proxy, this._settings, this._indicator);
+                    this._panel = new StrataPanel(proxy, this._settings);
                     // Push config now if the daemon is already up, and
                     // again on every owner transition so a respawned
                     // daemon picks up the latest values.

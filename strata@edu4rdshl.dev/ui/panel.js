@@ -22,10 +22,9 @@ function logError(label, err) {
 }
 
 export class StrataPanel {
-    constructor(proxy, settings, indicator = null) {
+    constructor(proxy, settings) {
         this._proxy = proxy;
         this._settings = settings;
-        this._indicator = indicator; // PanelMenu.Button - used to avoid toggle-reopen race
         this._pageSize = settings.get_int('page-size');
         this._pageSizeChangedId = settings.connect('changed::page-size',
             () => { this._pageSize = settings.get_int('page-size'); });
@@ -37,7 +36,7 @@ export class StrataPanel {
         this._thumbCache = new Map();
         /** Pagination state for the non-search view. */
         this._loadedOffset = 0;          // how many items we've already pulled
-        this._hasMore = true;            // false once daemon returns < PAGE_SIZE
+        this._hasMore = true;            // false once daemon returns less than a full page
         this._loadingMore = false;       // re-entrancy guard for scroll-driven loads
         /** Search state. */
         this._searchQuery = '';          // current search string ('' = no search)
@@ -153,14 +152,12 @@ export class StrataPanel {
             return Clutter.EVENT_PROPAGATE;
         });
 
-        // Panel box
         this._box = new St.BoxLayout({
             style_class: 'strata-panel',
             vertical: true,
             reactive: true,
         });
 
-        // Header row: title + clear button
         const header = new St.BoxLayout({
             style_class: 'strata-header',
             x_expand: true,
@@ -180,7 +177,6 @@ export class StrataPanel {
         header.add_child(title);
         header.add_child(clearBtn);
 
-        // Search box
         this._searchEntry = new St.Entry({
             hint_text: 'Search…',
             style_class: 'strata-search',
@@ -203,7 +199,6 @@ export class StrataPanel {
             return Clutter.EVENT_PROPAGATE;
         });
 
-        // Item list
         this._scrollView = new St.ScrollView({
             style_class: 'strata-scroll',
             x_expand: true,
@@ -225,13 +220,11 @@ export class StrataPanel {
             vadj.connect('notify::upper', () => this._maybeLoadMore());
         }
 
-        // Assemble
         this._box.add_child(header);
         this._box.add_child(this._searchEntry);
         this._box.add_child(this._scrollView);
         this._overlay.add_child(this._box);
 
-        // ESC to close
         this._overlay.connect('key-press-event', (_actor, event) => {
             if (event.get_key_symbol() === Clutter.KEY_Escape) {
                 this.close();
