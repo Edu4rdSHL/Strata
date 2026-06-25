@@ -317,8 +317,8 @@ export default class StrataExtension extends Extension {
             Main.messageTray.add(source);
             const notification = new MessageTray.Notification({
                 source,
-                title: 'Strata: daemon not found',
-                body: 'Install the strata-daemon package to enable clipboard history.',
+                title: 'Strata: daemon not installed',
+                body: 'Install the strata-daemon package. See the project page for instructions.',
                 urgency: MessageTray.Urgency.HIGH,
             });
             source.addNotification(notification);
