@@ -65,9 +65,6 @@ export default class StrataExtension extends Extension {
     _excludedApps = [];
     _pendingSignalId = null;
 
-    /** @type {boolean} Re-entrancy guard for signal processing */
-    _busy = false;
-
     /** @type {Set<number>} Pending GLib.idle_add source IDs to flush on disable. */
     _idleSources = new Set();
 
@@ -211,6 +208,7 @@ export default class StrataExtension extends Extension {
         // copied secrets with this hint mime. Honoring it lets users keep
         // their passwords out of clipboard history.
         if (mimes.includes('x-kde-passwordManagerHint')) return;
+        if (this._isExcluded(this._currentFocusedApp)) return;
         const mime = this._pickMime(mimes);
         if (!mime) return;
 
@@ -518,26 +516,9 @@ export default class StrataExtension extends Extension {
         }
         this._pendingSignalId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
             this._pendingSignalId = null;
-            this._processItemAdded(id, mimeType, preview)
-                .catch(e => logError('ItemAdded error', e));
+            this._addIdleSource(() => this._panel?.prependItem(id, mimeType, preview));
             return GLib.SOURCE_REMOVE;
         });
-    }
-
-    async _processItemAdded(id, mimeType, preview) {
-        if (this._busy) return;
-        this._busy = true;
-        try {
-            if (this._isExcluded(this._currentFocusedApp)) {
-                try {
-                    await this._proxy?.DeleteItemAsync(id);
-                } catch (_) { /* item may already be gone */ }
-                return;
-            }
-            this._addIdleSource(() => this._panel?.prependItem(id, mimeType, preview));
-        } finally {
-            this._busy = false;
-        }
     }
 
     _isExcluded(appClass) {
