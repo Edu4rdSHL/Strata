@@ -15,9 +15,8 @@ import { StrataProxy, BUS_NAME, OBJECT_PATH } from './dbus.js';
 import { StrataPanel } from './ui/panel.js';
 
 function logError(label, err) {
-    if (err !== undefined) {
-        try { Gio.DBusError.strip_remote_error(err); } catch (_) {}
-    }
+    if (err instanceof GLib.Error)
+        Gio.DBusError.strip_remote_error(err);
     const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
     console.error(`[Strata] ${label}${tail}`);
 }
@@ -110,7 +109,6 @@ export default class StrataExtension extends Extension {
             GLib.Source.remove(this._daemonRestartTimerId);
             this._daemonRestartTimerId = null;
         }
-        // Clean up in reverse order.
         this._unregisterShortcut();
         this._disconnectClipboardMonitor();
         this._disconnectFocusTracking();
@@ -235,7 +233,6 @@ export default class StrataExtension extends Extension {
     /** Pick the best MIME type to store from the offered list (mirrors Rust pick_mime). */
     _pickMime(mimes) {
         const PREFERRED = [
-            // Raster images (size-capped at MAX_IMAGE).
             'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp',
             'image/bmp', 'image/tiff', 'image/x-icon',
             // Plain text (UTF-8 preferred, then locale, then X11 legacy aliases).
@@ -281,7 +278,7 @@ export default class StrataExtension extends Extension {
                 try {
                     _conn.call_finish(result);
                     // Name already owned (e.g. systemd user service) - don't spawn a second instance.
-                } catch (_) {
+                } catch {
                     this._doSpawnDaemon();
                 }
             }
@@ -324,7 +321,7 @@ export default class StrataExtension extends Extension {
                 urgency: MessageTray.Urgency.HIGH,
             });
             source.addNotification(notification);
-        } catch (_) {
+        } catch {
             // Message tray may not be available (e.g. during early startup) - already logged above.
         }
     }
@@ -373,12 +370,12 @@ export default class StrataExtension extends Extension {
         try {
             // Graceful shutdown via D-Bus first.
             this._proxy?.ShutdownRemote(() => {});
-        } catch (_) {}
+        } catch { /* proxy may already be gone */ }
         // Give it 1.5s then force-terminate. Track the source so a re-enable
         // within that window can cancel it (see enable()).
         this._daemonKillTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, 1500, () => {
             this._daemonKillTimerId = null;
-            try { daemonToStop.send_signal(15); } catch (_) {} // SIGTERM
+            try { daemonToStop.send_signal(15); } catch { /* already exited */ } // SIGTERM
             return GLib.SOURCE_REMOVE;
         });
     }
@@ -440,7 +437,7 @@ export default class StrataExtension extends Extension {
                     const cachePath =
                         `${GLib.get_user_cache_dir()}/strata/thumbnails/${id}.png`;
                     GLib.unlink(cachePath);
-                } catch (_) {}
+                } catch { /* no cached thumbnail for this id */ }
                 this._addIdleSource(() => this._panel?.removeItem(id));
             });
 
@@ -454,7 +451,7 @@ export default class StrataExtension extends Extension {
                             'standard::name', Gio.FileQueryInfoFlags.NONE, null);
                         let info;
                         while ((info = en.next_file(null))) {
-                            try { d.get_child(info.get_name()).delete(null); } catch (_) {}
+                            try { d.get_child(info.get_name()).delete(null); } catch { /* best-effort cleanup */ }
                         }
                         en.close(null);
                     }

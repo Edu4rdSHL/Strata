@@ -14,9 +14,8 @@ const SEARCH_DEBOUNCE_MS = 150;
 const LOAD_MORE_THRESHOLD = 200;
 
 function logError(label, err) {
-    if (err !== undefined) {
-        try { Gio.DBusError.strip_remote_error(err); } catch (_) {}
-    }
+    if (err instanceof GLib.Error)
+        Gio.DBusError.strip_remote_error(err);
     const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
     console.error(`[Strata] ${label}${tail}`);
 }
@@ -83,7 +82,6 @@ export class StrataPanel {
         return this._interfaceSettings.get_string('color-scheme') !== 'prefer-dark';
     }
 
-    /** Toggle the light-theme class on the panel root box. */
     _applyTheme() {
         if (!this._box) return;
         if (this._effectiveIsLight())
@@ -103,7 +101,6 @@ export class StrataPanel {
 
 
     _buildUI() {
-        // Overlay container - sits above all windows.
         this._overlay = new St.Widget({
             layout_manager: new Clutter.FixedLayout(),
             visible: false,
@@ -190,7 +187,6 @@ export class StrataPanel {
         this._searchEntry.get_clutter_text().connect('text-changed', () => {
             this._scheduleSearch(this._searchEntry.get_text());
         });
-        // Down arrow from search box moves focus to the first item.
         this._searchEntry.get_clutter_text().connect('key-press-event', (_actor, event) => {
             if (event.get_key_symbol() === Clutter.KEY_Down) {
                 this._focusItem(0);
@@ -212,11 +208,9 @@ export class StrataPanel {
         });
         this._scrollView.set_child(this._itemList);
 
-        // Load more items when scrolled near the bottom.
         const vadj = this._scrollView.get_vadjustment();
         if (vadj) {
             vadj.connect('notify::value', () => this._maybeLoadMore());
-            // Also re-check when the list grows (a new page just appended).
             vadj.connect('notify::upper', () => this._maybeLoadMore());
         }
 
@@ -271,7 +265,6 @@ export class StrataPanel {
     close() {
         if (!this._visible) return;
         this._visible = false;
-        // Clear hover state since the panel is closing.
         this._hoveredWidget?.remove_style_class_name('strata-item-hovered');
         this._hoveredWidget = null;
         if (this._grab) {
@@ -293,7 +286,6 @@ export class StrataPanel {
                 this._widgets.delete(id);
             }
 
-            // While searching, only render if the new item matches the active query.
             if (this._searchQuery && !this._matchesSearch(preview, mimeType)) {
                 return;
             }
@@ -337,7 +329,6 @@ export class StrataPanel {
             if (wasHovered) this._hoveredWidget = null;
             widget.destroy();
             this._widgets.delete(id);
-            // Re-assign active to the new first visible item.
             if (wasActive) {
                 const first = this._getVisibleItems()[0];
                 if (first) this._setActiveWidget(first);
@@ -395,14 +386,15 @@ export class StrataPanel {
             const BATCH = 20;
             for (let i = 0; i < items.length; i += BATCH) {
                 if (!this._overlay) return false;
-                await new Promise(resolve =>
+                // eslint-disable-next-line no-await-in-loop -- batches deliberately yield to the main loop
+                await new Promise(resolve => {
                     GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                         const end = Math.min(i + BATCH, items.length);
                         for (let j = i; j < end; j++) this._appendItemFromMeta(items[j]);
                         resolve();
                         return GLib.SOURCE_REMOVE;
-                    })
-                );
+                    });
+                });
             }
             this._loadedOffset = offset + items.length;
             this._hasMore = items.length >= limit;
@@ -445,7 +437,6 @@ export class StrataPanel {
             // snapshot (no re-query, so a scroll cannot race the search).
             this._renderSearchPage(this._searchEpoch);
         } else {
-            // Browse mode: pull the next page from the daemon.
             if (!this._hasMore) return;
             this._loadingMore = true;
             this._loadHistory(this._loadedOffset, this._pageSize)
@@ -482,12 +473,14 @@ export class StrataPanel {
                 if (i === 0) {
                     renderChunk();
                 } else {
-                    await new Promise(resolve =>
+                    // eslint-disable-next-line no-await-in-loop -- batches deliberately yield to the main loop
+                    await new Promise(resolve => {
                         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                             renderChunk();
                             resolve();
                             return GLib.SOURCE_REMOVE;
-                        }));
+                        });
+                    });
                 }
             }
             this._searchRendered = end;
@@ -543,14 +536,12 @@ export class StrataPanel {
         return widget;
     }
 
-    /** Focus the item at visible-list index `idx` (clamped). */
     _focusItem(idx) {
         const items = this._getVisibleItems();
         if (items.length === 0) return;
         global.stage.set_key_focus(items[Math.max(0, Math.min(idx, items.length - 1))]);
     }
 
-    /** All currently-visible item actors in order. */
     _getVisibleItems() {
         return this._itemList.get_children().filter(c => c.visible);
     }
@@ -717,13 +708,11 @@ export class StrataPanel {
     }
 
     _moveItemToTop(id, widget) {
-        // Move data model entry to front.
         const idx = this._items.findIndex(i => i.id === id);
         if (idx > 0) {
             const [entry] = this._items.splice(idx, 1);
             this._items.unshift(entry);
         }
-        // Move actor to position 0 in the list.
         this._itemList.set_child_at_index(widget, 0);
     }
 
@@ -750,7 +739,6 @@ export class StrataPanel {
         const MARGIN = 16; // px gap from screen edge
 
         let x, y;
-        // Horizontal
         if (position.endsWith('left'))
             x = monitor.x + MARGIN;
         else if (position.endsWith('right'))

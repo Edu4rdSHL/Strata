@@ -3,7 +3,6 @@
 import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
 import Gdk from 'gi://Gdk';
-import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 
 import { ExtensionPreferences } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
@@ -211,7 +210,6 @@ export default class StrataPreferences extends ExtensionPreferences {
         for (const app of currentApps)
             model.append(app);
 
-        /** Sync the StringList back to GSettings. */
         const saveModel = () => {
             const apps = [];
             for (let i = 0; i < model.get_n_items(); i++) {

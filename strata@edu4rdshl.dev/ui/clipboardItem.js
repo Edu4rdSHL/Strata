@@ -22,24 +22,23 @@ function iconForMime(mimeType) {
     return 'edit-copy-symbolic';
 }
 
-/** Detect if a string looks like a URL. */
 function isUrl(text) {
     return /^https?:\/\/.+/i.test(text.trim());
 }
 
-/** Detect if a string looks like a CSS/hex color. */
 function isColor(text) {
     return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(text.trim());
 }
 
 export const ClipboardItem = GObject.registerClass({
+    GTypeName: 'StrataClipboardItem',
     Signals: {
         'activate': {},
         'delete':   {},
     },
-}, class ClipboardItem extends St.Button {
-    _init(id, mimeType, preview, opts = {}) {
-        super._init({
+}, class extends St.Button {
+    constructor(id, mimeType, preview, opts = {}) {
+        super({
             style_class: 'strata-item',
             x_expand: true,
             can_focus: true,
@@ -56,13 +55,9 @@ export const ClipboardItem = GObject.registerClass({
             x_expand: true,
         });
 
-        // Left: icon or image thumbnail
         row.add_child(this._buildLeading(mimeType, preview));
-
-        // Center: text preview
         row.add_child(this._buildContent(mimeType, preview));
 
-        // Right: delete button
         const deleteBtn = new St.Button({
             style_class: 'strata-item-delete',
             icon_name: 'edit-delete-symbolic',
@@ -122,7 +117,7 @@ export const ClipboardItem = GObject.registerClass({
         const applyStyle = () => {
             try {
                 container.style = `background-image: url("${fileUri}"); background-size: cover; background-repeat: no-repeat;`;
-            } catch (_) { /* container was destroyed mid-flight */ }
+            } catch { /* container was destroyed mid-flight */ }
         };
 
         try {
@@ -187,7 +182,7 @@ export const ClipboardItem = GObject.registerClass({
                 x_align: Clutter.ActorAlign.CENTER,
             });
             container.add_child(icon);
-        } catch (_) {}
+        } catch { /* container destroyed before the icon was added */ }
     }
 
     _buildColorSwatch(hex) {
@@ -208,8 +203,8 @@ export const ClipboardItem = GObject.registerClass({
             style_class: 'strata-item-content',
         });
 
-        let mainText = '';
-        let subText  = '';
+        let mainText;
+        let subText = '';
 
         if (mimeType.startsWith('image/')) {
             // Generic label - the thumbnail identifies the image, and the
@@ -219,8 +214,8 @@ export const ClipboardItem = GObject.registerClass({
         } else if (isUrl(preview)) {
             mainText = preview.trim();
             try {
-                subText = new URL(preview.trim()).hostname;
-            } catch (_) {}
+                subText = GLib.Uri.parse(preview.trim(), GLib.UriFlags.NONE).get_host() ?? '';
+            } catch { /* not a parseable URI */ }
         } else if (isColor(preview)) {
             mainText = preview.trim().toUpperCase();
             subText  = 'Color';
