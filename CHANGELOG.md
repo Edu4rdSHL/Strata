@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.10.0] - 2026-06-25
+
+The daemon is unchanged from 0.9.0; all changes are in the GNOME Shell extension.
+
+### Fixed
+
+- URL items now show their hostname as a subtitle. The old code used the WHATWG
+  `URL` API, which GJS does not provide, so it always threw and the subtitle
+  never appeared. It now uses `GLib.Uri`.
+- The packaged extension was missing `dbus.js`. The extension imports it, but
+  `make pack` did not bundle it, so installing from the packaged zip would
+  fail to load. It is now included.
+
+### Changed
+
+- `ClipboardItem` uses a `constructor()` with an explicit `GTypeName` instead of
+  `_init()`.
+- The error-logging helper lives in a single `util.js` module shared by the
+  extension, panel, and item widget.
+
+### Internal
+
+- Adopted the GJS ESLint style guide: an `eslint.config.js` flat config, an
+  `npm run lint` script, and a GitHub Actions workflow that lints on push and
+  pull requests. The extension passes with no warnings.
+
+---
+
 ## [0.9.0] - 2026-06-25
 
 The daemon is unchanged from 0.8.0; all changes are in the GNOME Shell extension.
