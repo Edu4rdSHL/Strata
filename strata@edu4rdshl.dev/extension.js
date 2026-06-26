@@ -13,13 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 import { StrataProxy, BUS_NAME, OBJECT_PATH } from './dbus.js';
 import { StrataPanel } from './ui/panel.js';
-
-function logError(label, err) {
-    if (err instanceof GLib.Error)
-        Gio.DBusError.strip_remote_error(err);
-    const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
-    console.error(`[Strata] ${label}${tail}`);
-}
+import { logError } from './util.js';
 
 export default class StrataExtension extends Extension {
     /** @type {Gio.Subprocess | null} */

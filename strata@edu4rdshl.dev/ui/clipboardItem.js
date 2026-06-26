@@ -6,6 +6,8 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 
+import { logError } from '../util.js';
+
 const TEXT_PREVIEW_LEN = 140;
 const THUMB_SIZE = 48;
 
@@ -155,18 +157,18 @@ export const ClipboardItem = GObject.registerClass({
                                 this._thumbCache?.set(id, cachePath);
                                 applyStyle();
                             } catch (e) {
-                                console.error('[Strata] Thumbnail write error:', e);
+                                logError('Thumbnail write error', e);
                                 this._fallbackIcon(container);
                             }
                         }
                     );
                 } catch (e) {
-                    console.error('[Strata] Thumbnail fetch handler error:', e);
+                    logError('Thumbnail fetch handler error', e);
                     this._fallbackIcon(container);
                 }
             });
         } catch (e) {
-            console.error('[Strata] Thumbnail render error:', e);
+            logError('Thumbnail render error', e);
             this._fallbackIcon(container);
         }
         return container;

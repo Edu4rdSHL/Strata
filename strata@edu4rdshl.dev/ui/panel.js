@@ -9,16 +9,10 @@ import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { ClipboardItem } from './clipboardItem.js';
+import { logError } from '../util.js';
 
 const SEARCH_DEBOUNCE_MS = 150;
 const LOAD_MORE_THRESHOLD = 200;
-
-function logError(label, err) {
-    if (err instanceof GLib.Error)
-        Gio.DBusError.strip_remote_error(err);
-    const tail = err !== undefined ? `: ${err?.message ?? err}` : '';
-    console.error(`[Strata] ${label}${tail}`);
-}
 
 export class StrataPanel {
     constructor(proxy, settings) {
