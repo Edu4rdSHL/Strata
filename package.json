@@ -1,0 +1,14 @@
+{
+  "name": "strata-extension",
+  "version": "0.9.0",
+  "description": "Lint tooling for the Strata GNOME Shell extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint 'strata@edu4rdshl.dev'"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.0.0"
+  }
+}

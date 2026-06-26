@@ -10,6 +10,11 @@ strata@edu4rdshl.dev/bin/
 # External reference code (not part of this project)
 external_sources/
 
+# Node / lint tooling
+node_modules/
+package-lock.json
+*.shell-extension.zip
+
 # Editor / OS
 .vscode/
 .idea/
